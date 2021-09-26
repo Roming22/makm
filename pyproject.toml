@@ -1,0 +1,24 @@
+[tool.poetry]
+authors = ["Your Name <user@example.com>"]
+description = ""
+name = "myapp"
+packages = [{include = "myapp", from = "src"}]
+version = "0.0.dev0"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.dev-dependencies]
+black = "^20.8b1"
+isort = "^5.7.0"
+mypy = "^0.812"
+pyenchant = "^3.2.0"
+pylint = "^2.7.0"
+pytest = "^6.2.5"
+pytest-cov = "^2.11.1"
+pytest-xdist = "^2.2.1"
+shellcheck-py = "^0.7.1"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]
