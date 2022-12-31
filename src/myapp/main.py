@@ -21,7 +21,7 @@ def main(keyboard: str) -> None:
     config = config_reader.read(keyboard)
     print(config)
     corpus = corpus_processor.generate_data(config["preferences"]["corpus"])
-    print(corpus)
+    # print(corpus)
 
 if __name__ == "__main__":
     main()

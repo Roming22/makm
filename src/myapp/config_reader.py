@@ -26,4 +26,6 @@ def extend_corpus_data(config: dict, data_dir:str) -> None:
             path = f"{data_dir}/corpus/{_i}/{_j}"
             if _i == "code":
                 config[_i][_j].update(load_yaml(path+"/config.yaml"))
+            else:
+                config[_i][_j]["extensions"] = ["txt"]
             config[_i][_j]["path"] = path
