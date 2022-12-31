@@ -6,7 +6,25 @@ import typing
 def generate(corpus: dict, config:dict):
     heatmap = sorted(generate_heatmap(config)[".keys"].items(), key=lambda x:x[1], reverse=True)
     print(heatmap)
-    keys = corpus["letter_count"]
+    keymap = {k: {
+        "heat": v,
+        "key": None,
+        "score": None
+     } for k,v in heatmap}
+    keymap_tree = {
+        "heatmap": heatmap,
+        "key": "root",
+        "keymap": keymap,
+        "max_score": None,
+        "min_score": None,
+        "nodes": [],
+        "parent": None,
+        "score": None,
+        "todo": sorted(corpus["letter_count"].items(), key=lambda x:x[1]),
+    }
+    search_for_best_keymap(keymap_tree, corpus)
+    # keyboard = keymap_to_keyboard(keymap)
+    # print_keyboard(keyboard)
     return
 
 def generate_keyboard_layout(config: dict) -> dict:
@@ -54,15 +72,33 @@ def print_keyboard(keyboard: dict) -> None:
                 print(" | ", end="")
             print()
 
-# def add_key_to_layout(keys: list[str], layout: list) -> typing.Iterator[list]:
-#     if keys:
-#         _keys = list(keys)
-#         _k = keys.pop
-#         _layout = list(layout)
-#     else:
-#         return
-#     for _r in _layout:
-#         for _c in _r:
-#             if not _layout[_r][_c]:
-#                 _layout[_r][_c] = _k
-#                 yield add_key_to_layout(_keys, _layout)
+def search_for_best_keymap(keymap_tree: dict, corpus:dict):
+    if not keymap_tree["todo"]:
+        return
+
+    add_key_to_keymap_tree(keymap_tree)
+    # update_score(keymap_tree, config)
+    # prune_deadends(keymap_tree)
+    for node in keymap_tree["nodes"]:
+        search_for_best_keymap(node, corpus)
+
+def add_key_to_keymap_tree(parent:dict) -> None:
+    key = parent["todo"][-1]
+    print(key)
+    for _key in parent["heatmap"]:
+        new_node = {
+        "heatmap": copy.deepcopy(parent["heatmap"]),
+        "key": key[0],
+        "keymap": copy.deepcopy(parent["keymap"]),
+        "max_score": None,
+        "min_score": None,
+        "nodes": [],
+        "parent": parent,
+        "score": key[1],
+        "todo": parent["todo"][:-1],
+    }
+        print(_key)
+        new_node["heatmap"].remove(_key)
+        # new_node["keymap"]["key"] = _key
+        new_node["todo"] = []
+        parent["nodes"].append(new_node)

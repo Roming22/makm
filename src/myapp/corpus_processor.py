@@ -27,7 +27,6 @@ def consolidate_data(language_data: dict) -> dict:
         for _, data in language_data.items():
             for _datapoint, _v in data[_k].items():
                 count_type[_datapoint] = count_type.get(_datapoint, 0) + _v
-        count_type = sorted(count_type.items(), key=lambda x:x[1], reverse=True)
     return corpus_data
 
 
