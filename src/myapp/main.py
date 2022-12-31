@@ -8,17 +8,17 @@ from myapp.__version__ import __commit__, __version__
 
 APP_NAME = __name__.split(".", maxsplit=1)[0]
 
+import click
+import config_reader
 
-def main(args: list[str]) -> None:
+
+@click.command()
+@click.option('-k', '--keyboard', default="3-4h-2t", help='keyboard layout. See available layouts in data/config/keyboards')
+def main(keyboard: str) -> None:
     """Main function"""
-    echo(f"{APP_NAME} {__version__} ({__commit__})")
-    echo(f"Args: {args}")
-
-
-def echo(message: str) -> None:
-    """This gives us something to mock"""
-    print(message)
-
+    print(f"{APP_NAME} {__version__} ({__commit__})")
+    config = config_reader.read(keyboard)
+    print(config)
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()
