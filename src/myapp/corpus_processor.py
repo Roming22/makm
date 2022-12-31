@@ -87,6 +87,7 @@ def load_file_data(file, data) -> int:
     size = 0
     for line in file.readlines():
         line = line.strip()
+        line = clean_line(line)
         for word in line.split():
             load_word_data(word, data)
             size += len(word)
@@ -96,7 +97,7 @@ def load_file_data(file, data) -> int:
 def load_word_data(word, data):
     p0, p1, p2 = None, None, None
     for char in word:
-        p0, p1, p2 = clean_char(char.lower()), p0, p1
+        p0, p1, p2 = char, p0, p1
         data["letter_count"][p0] = data["letter_count"].get(p0, 0) + 1
         if p1 and p1 != p0:
             bigram = "".join(sorted(p0 + p1))
@@ -106,14 +107,30 @@ def load_word_data(word, data):
             data["trigram_count"][trigram] = data["trigram_count"].get(trigram, 0) + 1
 
 
-def clean_char(char: str) -> str:
-    map = {
+def clean_line(line: str) -> str:
+    # That map may need to be per language
+    translate_map = {
         "\u2014": "-",
         "\u2019": "'",
         "\u201C": '"',
         "\u201D": '"',
     }
-    return map.get(char, char)
+    # That map may need to be per language.
+    allowlist = "abcdefghijklmnopqrstuvwxyz"
+
+    _line = list(line)
+    for _i, _c in enumerate(_line):
+        tr = None
+        if _c not in allowlist:
+            tr = " "
+        elif _c in translate_map.keys():
+            tr = translate_map[_c]
+        else:
+            tr = _c.lower()
+        _line[_i] = tr
+    line = "".join(_line)
+    line = line.strip()
+    return line
 
 
 def generate_code_data(languages: dict) -> dict:
