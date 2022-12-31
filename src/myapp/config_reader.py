@@ -14,6 +14,7 @@ def read(keyboard: str) -> dict:
         "preferences": load_yaml(f"{config_dir}/preferences.yaml"),
     }
     extend_corpus_data(config["preferences"]["corpus"], data_dir)
+    extend_keyboard_data(config)
     return config
 
 def load_yaml(filepath: str) -> dict:
@@ -29,3 +30,6 @@ def extend_corpus_data(config: dict, data_dir:str) -> None:
             else:
                 config[_i][_j]["extensions"] = ["txt"]
             config[_i][_j]["path"] = path
+
+def extend_keyboard_data(config) -> None:
+    config["keyboard"]["score"].update(config["preferences"]["score"])

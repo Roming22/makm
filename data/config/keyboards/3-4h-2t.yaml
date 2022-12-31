@@ -1,3 +1,70 @@
-top_row: imr
-home_row: imrp
-# thumb_cluster: 2
+score:
+  layers:
+    layer1: 0
+    layer2: -5
+    layer3: -10
+    layer4: -11
+  rows:
+    home: 0
+    top: -3
+    cluster: 0
+layout:
+    rows:
+      top:
+        left:
+          - ring
+          - major
+          - index
+        right:
+          - index
+          - major
+          - ring
+      home:
+        left:
+          - pinky
+          - ring
+          - major
+          - index
+        right:
+          - index
+          - major
+          - ring
+          - pinky
+      cluster:
+        left:
+          - thumb1
+          - thumb2
+        right:
+          - thumb2
+          - thumb1
+    layers:
+      - layer1
+      - layer2
+      - layer3
+      - layer4
+constraints:
+  - layer1:
+      - left:
+        - thumb1: "space/shift"
+        - thumb2: "meh"
+      - right:
+        - thumb1: "layer2"
+        - thumb2: "enter"
+  - layer2:
+    - cluster:
+      - left:
+        - thumb1: "space/shift"
+        - thumb2: "layer1"
+      - right:
+        - thumb1: "layer3"
+        - thumb2: "layer4"
+  - layer3:
+    - cluster:
+      - left:
+        - thumb1: "space/shift"
+        - thumb2: "layer1"
+  - layer4:
+    - cluster:
+      - left:
+        - thumb1: "space/shift"
+        - thumb2: "layer1"

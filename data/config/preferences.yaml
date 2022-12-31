@@ -1,20 +1,19 @@
 score:
   fingers:
-    index: 10
-    major: 8
-    ring: 6
-    pinky: 3
-    thumb: 8
-  rows:
-    top: 7
-    home: 10
-  transition_bonus:
-    bigram: 10
-    trigram: 5
-  transition_penalty:
-    column: -5
-    row: -5
-    layer: -7
+    left:
+      thumb1: 0
+      thumb2: -3
+      index: 3
+      major: 0
+      ring: -2
+      pinky: -4
+    right:
+      thumb1: 0
+      thumb2: -3
+      index: 3
+      major: 0
+      ring: -2
+      pinky: -4
 corpus:
   i18n:
     en-us:

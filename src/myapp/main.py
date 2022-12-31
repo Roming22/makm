@@ -11,6 +11,7 @@ APP_NAME = __name__.split(".", maxsplit=1)[0]
 import click
 import config_reader
 import corpus_processor
+import layout_generator
 
 
 @click.command()
@@ -21,7 +22,7 @@ def main(keyboard: str) -> None:
     config = config_reader.read(keyboard)
     print(config)
     corpus = corpus_processor.generate_data(config["preferences"]["corpus"])
-    # print(corpus)
+    layout_generator.generate(corpus, config)
 
 if __name__ == "__main__":
     main()
