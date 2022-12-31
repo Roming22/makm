@@ -10,6 +10,7 @@ APP_NAME = __name__.split(".", maxsplit=1)[0]
 
 import click
 import config_reader
+import corpus_processor
 
 
 @click.command()
@@ -19,6 +20,8 @@ def main(keyboard: str) -> None:
     print(f"{APP_NAME} {__version__} ({__commit__})")
     config = config_reader.read(keyboard)
     print(config)
+    corpus = corpus_processor.generate_data(config["preferences"]["corpus"])
+    print(corpus)
 
 if __name__ == "__main__":
     main()
