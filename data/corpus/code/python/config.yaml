@@ -1,0 +1,4 @@
+extensions:
+  - py
+git_urls:
+  - https://github.com/nvbn/thefuck.git

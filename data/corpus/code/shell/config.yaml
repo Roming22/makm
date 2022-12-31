@@ -1,0 +1,4 @@
+extensions:
+  - sh
+git_urls:
+  - https://github.com/nvm-sh/nvm.git
