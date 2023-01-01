@@ -15,7 +15,12 @@ import layout_generator
 
 
 @click.command()
-@click.option('-k', '--keyboard', default="3-4h-2t", help='keyboard layout. See available layouts in data/config/keyboards')
+@click.option(
+    "-k",
+    "--keyboard",
+    default="3-4h-2t",
+    help="keyboard layout. See available layouts in data/config/keyboards",
+)
 def main(keyboard: str) -> None:
     """Main function"""
     print(f"{APP_NAME} {__version__} ({__commit__})")
@@ -23,6 +28,7 @@ def main(keyboard: str) -> None:
     print(config)
     corpus = corpus_processor.generate_data(config["preferences"]["corpus"])
     layout_generator.generate(corpus, config)
+
 
 if __name__ == "__main__":
     main()
