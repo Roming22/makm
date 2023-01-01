@@ -1,28 +1,33 @@
 """Generate keyboard layouts"""
 import copy
-import typing
+import random
 
+random.seed("test")
 
 def generate(corpus: dict, config:dict):
     heatmap = sorted(generate_heatmap(config)[".keys"].items(), key=lambda x:x[1], reverse=True)
     print(heatmap)
-    keymap = {k: {
-        "heat": v,
-        "key": None,
-        "score": None
-     } for k,v in heatmap}
+    keymap = {
+        k: {
+            "heat": v,
+            "key": None,
+            "score": None
+        }
+        for k,v in heatmap
+    }
     keymap_tree = {
         "heatmap": heatmap,
         "key": "root",
         "keymap": keymap,
         "max_score": None,
         "min_score": None,
+        "missing_keys": sorted(corpus["letter_count"].items(), key=lambda x:x[1]),
         "nodes": [],
         "parent": None,
+        "progress": 0,
         "score": None,
-        "todo": sorted(corpus["letter_count"].items(), key=lambda x:x[1]),
     }
-    search_for_best_keymap(keymap_tree, corpus)
+    search_for_best_keymap(keymap_tree, corpus, config)
     # keyboard = keymap_to_keyboard(keymap)
     # print_keyboard(keyboard)
     return
@@ -72,33 +77,54 @@ def print_keyboard(keyboard: dict) -> None:
                 print(" | ", end="")
             print()
 
-def search_for_best_keymap(keymap_tree: dict, corpus:dict):
-    if not keymap_tree["todo"]:
+def search_for_best_keymap(keymap_tree: dict, corpus:dict, config:dict):
+    if not keymap_tree["missing_keys"]:
+        print("No more keys :)")
         return
 
     add_key_to_keymap_tree(keymap_tree)
-    # update_score(keymap_tree, config)
-    # prune_deadends(keymap_tree)
+    remove_deadends(keymap_tree)
     for node in keymap_tree["nodes"]:
-        search_for_best_keymap(node, corpus)
+        keymap_tree["progress"] += 1
+        display_progress(node)
+        search_for_best_keymap(node, corpus, config)
 
-def add_key_to_keymap_tree(parent:dict) -> None:
-    key = parent["todo"][-1]
-    print(key)
-    for _key in parent["heatmap"]:
-        new_node = {
-        "heatmap": copy.deepcopy(parent["heatmap"]),
+def add_key_to_keymap_tree(node:dict) -> None:
+    key = node["missing_keys"][-1]
+    for _key in node["heatmap"]:
+        child = {
+        "heatmap": copy.deepcopy(node["heatmap"]),
+        "heatkey": _key,
         "key": key[0],
-        "keymap": copy.deepcopy(parent["keymap"]),
+        "keymap": copy.deepcopy(node["keymap"]),
         "max_score": None,
         "min_score": None,
+        "missing_keys": node["missing_keys"][:-1],
         "nodes": [],
-        "parent": parent,
+        "parent": node,
+        "progress": 0,
         "score": key[1],
-        "todo": parent["todo"][:-1],
     }
-        print(_key)
-        new_node["heatmap"].remove(_key)
-        # new_node["keymap"]["key"] = _key
-        new_node["todo"] = []
-        parent["nodes"].append(new_node)
+        child["heatmap"].remove(_key)
+        child["min_score"] = random.randint(0, 100)
+        child["max_score"] = child["min_score"] + random.randint(0, 40)
+        print(key, _key)
+        node["nodes"].append(child)
+
+def remove_deadends(node: dict) -> None:
+    min_score = max([n["min_score"] for n in node["nodes"]])
+    remove = []
+    for child in node["nodes"]:
+        if child["max_score"] < min_score:
+            remove.append(child)
+    for child in remove:
+        print("Deadend:", child["key"], child["heatkey"])
+        node["nodes"].remove(child)
+
+def display_progress(node:dict) -> None:
+    progress = []
+    while node["parent"]:
+        progress.append(f"{node['progress']}/{len(node['nodes'])}")
+        node = node["parent"]
+    progress.append(f"{node['progress']}/{len(node['nodes'])}")
+    print(" / ".join(reversed(progress)))
