@@ -91,6 +91,8 @@ def load_file_data(file, data) -> int:
         for word in line.split():
             load_word_data(word, data)
             size += len(word)
+            data["letter_count"]["\\s"] = data["letter_count"].get("\\s", 0) + 1
+        data["letter_count"]["\\n"] = data["letter_count"].get("\\n", 0) + 1
     return size
 
 
