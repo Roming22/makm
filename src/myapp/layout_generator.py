@@ -1,15 +1,22 @@
 """Generate keyboard layouts"""
 import random
-import time
 
 import layout_calculator
 from keyboard import Char, Keyboard
 
 
 def generate(corpus: dict, config: dict):
+    for rows in config["keyboard"]["constraints"].values():
+        for hands in rows.values():
+            for fingers in hands.values():
+                for finger, char in fingers.items():
+                    try:
+                        fingers[finger] = (char, corpus["letter_count"].pop(char))
+                    except:
+                        fingers[finger] = (char, 0)
     keyboard = Keyboard(config["keyboard"])
     keyboard.print("heat")
-    chars = [
+    corpus_chars = [
         Char(c, v)
         for c, v in sorted(corpus["letter_count"].items(), key=lambda x: x[1])
     ]
@@ -19,7 +26,7 @@ def generate(corpus: dict, config: dict):
         "keyboard": keyboard,
         "worst_score": None,
         "best_score": None,
-        "missing_chars": chars,
+        "missing_chars": corpus_chars,
         "nodes": [],
         "parent": None,
         "progress": 0,

@@ -1,7 +1,6 @@
 """Representation of a keyboard keys and layout"""
 import collections
 import copy
-import itertools
 
 
 class Keyboard:
@@ -22,6 +21,18 @@ class Keyboard:
         for layer in config["layout"]["layers"]:
             score = config["score"]["layers"][layer]
             self.layer[layer] = Layer(layout, score, layer)
+        for layer, rows in config["constraints"].items():
+            for row, hands in rows.items():
+                for hand, fingers in hands.items():
+                    print(layer, row, hand)
+                    for finger, char in fingers.items():
+                        print(char)
+                        fingering = (row, hand, finger)
+                        key = self.layer[layer].layout.row[row][fingering]
+                        key.char = Char(char[0], char[1])
+                        self.layer[layer].char[char] = key.char
+                        self.layer[layer].free_keys.remove(key)
+        self.print()
 
     def assign_char_to_key(self, char, key) -> None:
         key = self.layer[key.layer].layout.row[key.fingering[0]][key.fingering]

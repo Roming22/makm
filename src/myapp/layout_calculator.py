@@ -29,7 +29,8 @@ def get_base_score(keyboard: Keyboard, corpus: dict, config: dict) -> float:
     """Score with the populated keys"""
     score = 0.0
     for char in keyboard.get_chars().values():
-        score += char.score * char.key.score
+        if char is not None and char.key is not None:
+            score += char.score * char.key.score
         # score += get_ngram_score(
         #     key,
         #     char,

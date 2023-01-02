@@ -47,37 +47,39 @@ layout:
     # - layer3
     # - layer4
 constraints:
-  - layer1:
-      - thumb1:
-          - left:
-              - thumb: "\\s"
-          - right:
-              - thumb: "layer2"
-      - thumb2:
-          - left:
-              - thumb: "meh"
-          - right:
-              - thumb: "\\n"
-  - layer2:
-      - thumb1:
-          - left:
-              - thumb: "\\s"
-          - right:
-              - thumb: "layer1"
-      - thumb2:
-          - left:
-              - thumb: "layer3"
-          - right:
-              - thumb: "layer4"
-  - layer3:
-      - thumb1:
-          - left:
-              - thumb: "\\s"
-          - right:
-              - thumb: "layer1"
-  - layer4:
-      - thumb1:
-          - left:
-              - thumb: "\\s"
-          - right:
-              - thumb: "layer1"
+  layer1:
+    thumb1:
+      left:
+        thumb: "\\s"
+      #   right:
+      #     thumb: "#2"
+      # thumb2:
+      #   left:
+      #     thumb: "mh"
+      right:
+        thumb: "\\n"
+  layer2:
+    thumb1:
+      left:
+        thumb: "\\s"
+      right:
+        thumb: "#3"
+    # thumb2:
+    #   left:
+    #     thumb: "#1"
+    #   right:
+    #     thumb: "#4"
+  # layer3:
+  #   thumb1:
+  #     left:
+  #       thumb: "\\s"
+  #   thumb2:
+  #     left:
+  #       thumb: "#1"
+  # layer4:
+  #   thumb1:
+  #     left:
+  #       thumb: "\\s"
+  #   thumb2:
+  #     left:
+  #       thumb: "#1"

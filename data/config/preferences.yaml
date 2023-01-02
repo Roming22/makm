@@ -5,13 +5,13 @@ score:
       index: 1
       major: 3
       ring: 5
-      pinky: 9
+      pinky: 11
     right:
       thumb: 8
       index: 2
       major: 4
       ring: 6
-      pinky: 10
+      pinky: 12
   rolls:
     bigram: -2
     trigram: -2
