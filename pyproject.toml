@@ -22,6 +22,9 @@ pytest-cov = "^2.11.1"
 pytest-xdist = "^2.2.1"
 shellcheck-py = "^0.7.1"
 
+[tool.poetry.group.dev.dependencies]
+snakeviz = "^2.1.1"
+
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core>=1.0.0"]
