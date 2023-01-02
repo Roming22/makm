@@ -1,11 +1,13 @@
 """Generate keyboard layouts"""
 import random
+import time
 
-import layout_calculator
 from keyboard import Char, Keyboard
+from layout_calculator import Calculator
 
 
 def generate(corpus: dict, config: dict):
+    # Add constraints to keyboard layout
     for rows in config["keyboard"]["constraints"].values():
         for hands in rows.values():
             for fingers in hands.values():
@@ -16,9 +18,10 @@ def generate(corpus: dict, config: dict):
                         fingers[finger] = (char, 0)
     keyboard = Keyboard(config["keyboard"])
     keyboard.print("heat")
+    Calculator.get().set(corpus, config)
     corpus_chars = [
         Char(c, v)
-        for c, v in sorted(corpus["letter_count"].items(), key=lambda x: x[1])
+        for c, v in sorted(corpus["letter_count"].items(), key=lambda x: x[1])[-6:]
     ]
     keyboard_tree = {
         "char": "root",
@@ -31,38 +34,40 @@ def generate(corpus: dict, config: dict):
         "parent": None,
         "progress": 0,
     }
-    search_for_best_keyboard(keyboard_tree, corpus, config)
+    start_time = time.time()
+    search_for_best_keyboard(keyboard_tree)
+    runtime = time.time() - start_time
     keyboards = keyboardtree_to_keyboards(keyboard_tree)
     print(len(keyboards), "keyboard generated")
     for keyboard in keyboards:
         keyboard.print()
-    print(len(keyboards), "keyboard generated")
+    print(Keyboard.count / runtime, "keyboards/s")
     return
 
 
-def search_for_best_keyboard(node: dict, corpus: dict, config: dict):
+def search_for_best_keyboard(node: dict):
+    print(".", end="", flush=True)
     if not node["missing_chars"]:
-        if random.randint(1, 10) == 10:
-            display_progress(node)
-        # print("No more keys :)")
+        print()
+        display_progress(node)
         return
 
-    add_key_to_keyboard_tree(node, corpus, config)
+    add_key_to_keyboard_tree(node)
     remove_deadends(node)
     for child in node["nodes"]:
         node["progress"] += 1
-        search_for_best_keyboard(child, corpus, config)
+        search_for_best_keyboard(child)
 
 
-def add_key_to_keyboard_tree(node: dict, corpus: dict, config: dict) -> None:
+def add_key_to_keyboard_tree(node: dict) -> None:
     char = node["missing_chars"][-1]
     free_keys = node["keyboard"].get_free_keys()
     if not free_keys:
         raise Exception("Not enough keys")
-    for key in free_keys:
+    for key in free_keys[:5]:
         child = {
             "char": char.char,
-            "key": (key.layer, *key.fingering),
+            "key": (key.layer.name, *key.fingering),
             "keyboard": node["keyboard"].copy(),
             "worst_score": None,
             "best_score": None,
@@ -71,22 +76,25 @@ def add_key_to_keyboard_tree(node: dict, corpus: dict, config: dict) -> None:
             "parent": node,
             "progress": 0,
         }
-        child["keyboard"].assign_char_to_key(char, key)
+        child_key = child["keyboard"].assign_char_to_key(char, key)
         if len(child["keyboard"].get_free_keys()) != len(free_keys) - 1:
             raise Exception("Bad object management")
-        child["best_score"], child["worst_score"] = layout_calculator.get_score(
-            child["keyboard"], child["missing_chars"], corpus, config
+        child["best_score"], child["worst_score"] = Calculator.get().get_score_for_key(
+            child_key, child["keyboard"], child["missing_chars"]
         )
         node["nodes"].append(child)
 
 
 def remove_deadends(node: dict) -> None:
-    best_score = min([n["best_score"] for n in node["nodes"]])
-    # print("bestscore for", node["char"], ":", best_score)
+    worst_score = min([n["worst_score"] for n in node["nodes"]])
+    if node["worst_score"] is not None:
+        worst_score = min(worst_score, node["worst_score"])
     remove = []
     for child in node["nodes"]:
-        if child["worst_score"] > best_score:
+        # print(child["char"], child["key"], child["best_score"], child["worst_score"])
+        if child["best_score"] > worst_score:
             remove.append(child)
+    time.sleep(2)
     for child in remove:
         # print("Deadend:", child["key"])
         node["nodes"].remove(child)
@@ -97,12 +105,9 @@ def display_progress(node: dict) -> None:
     progress = []
     parent = node["parent"]
     while parent:
-        progress.append(
-            # f"{parent['nodes'][0]['char']}: {parent['progress']}/{len(parent['nodes'])}"
-            f"{parent['progress']}/{len(parent['nodes'])}"
-        )
+        progress.append(f"{parent['progress']}/{len(parent['nodes'])}")
         parent = parent["parent"]
-    print("-".join(reversed(progress)))
+    print("-".join(reversed(progress)), end="", flush=True)
 
 
 def keyboardtree_to_keyboards(node: dict) -> list:
@@ -113,6 +118,7 @@ def keyboardtree_to_keyboards(node: dict) -> list:
         for nd in nodes:
             new_nodes += nd["nodes"]
         if not nd["missing_chars"]:
+            print("keyboard score:", nd["best_score"], nd["worst_score"])
             keyboards.append(nd["keyboard"])
         nodes = new_nodes
 

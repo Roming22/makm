@@ -7,20 +7,21 @@ class Keyboard:
     """Representation of a keyboard, with its keys and layout"""
 
     _name = "Keyboard"
-    _count = 0
+    count = 0
 
     def __init__(self, config: dict, name: str = None) -> None:
         self._config = config["layout"]["layers"]
-        Keyboard._count += 1
+        Keyboard.count += 1
         self.layer = {}
         if not name:
-            name = f"{self._name}{self._count}"
+            name = f"{self._name}{self.count}"
         self.name = name
 
         layout = Layout(config)
         for layer in config["layout"]["layers"]:
             score = config["score"]["layers"][layer]
             self.layer[layer] = Layer(layout, score, layer)
+
         for layer, rows in config["constraints"].items():
             for row, hands in rows.items():
                 for hand, fingers in hands.items():
@@ -34,13 +35,14 @@ class Keyboard:
                         self.layer[layer].free_keys.remove(key)
         self.print()
 
-    def assign_char_to_key(self, char, key) -> None:
-        key = self.layer[key.layer].layout.row[key.fingering[0]][key.fingering]
+    def assign_char_to_key(self, char, key):
+        key = self.layer[key.layer.name].layout.row[key.fingering[0]][key.fingering]
         key.char = char
         char.key = key
-        layer = self.layer[key.layer]
+        layer = self.layer[key.layer.name]
         layer.char[char.char] = char
         layer.free_keys.remove(key)
+        return key
 
     def copy(self, name: str = None):
         Keyboard._count += 1
@@ -80,12 +82,17 @@ class Layout:
         for row, hands in config["layout"]["rows"].items():
             self.row[row] = {}
             for hand, fingers in hands.items():
+                previous = False
                 for finger in fingers:
                     fingering = (row, hand, finger)
                     score = config["score"]["rows"][row]
                     score += config["score"]["fingers"][hand][finger]
-                    key = Key(fingering, score)
+                    key = Key(fingering, score, previous)
                     self.row[row][fingering] = key
+                    if previous:
+                        previous.roll_next = key
+                    previous = key
+                previous.roll_next = False
 
 
 class Layer:
@@ -101,7 +108,7 @@ class Layer:
             for hand, fingers in hands.items():
                 for finger in fingers:
                     key = self.layout.row[row][(row, hand, finger)]
-                    key.layer = name
+                    key.layer = self
                     key.score += score
                     self.free_keys.append(key)
 
@@ -111,11 +118,17 @@ class Layer:
         layer.free_keys = []
         for row, hands in layer.layout._config.items():
             for hand, fingers in hands.items():
+                previous = False
                 for finger in fingers:
                     fingering = (row, hand, finger)
                     key = layer.layout.row.get(row, {}).get(fingering)
+                    if previous is not False:
+                        previous.roll_next = key
                     if key.char is None:
                         layer.free_keys.append(key)
+                    previous = key
+                key.roll_next = False
+                previous.roll_next = key
         return layer
 
     def print(self, mode):
@@ -140,7 +153,7 @@ class Layer:
             lines.append(line)
             middle = max(middle, line.index("|"))
         for line in lines:
-            line = " " * (middle - line.index("|")) + line[:-2]
+            line = " " * (middle - line.index("|")) + line[:-3]
             print(line)
 
 
@@ -156,6 +169,36 @@ class Key:
         # Help figuring out ngrams
         self.roll_previous = roll_previous
         self.roll_next = None
+
+    def get_rolls(self, count) -> list:
+        key = self
+        previous_roll = [key]
+        while len(previous_roll) < count:
+            if key.roll_previous:
+                key = key.roll_previous
+                previous_roll.append(key)
+            else:
+                previous_roll.clear()
+                break
+        if previous_roll and len(previous_roll) != count:
+            raise Exception(
+                f"Bad previous_roll has been generated, got {len(previous_roll)} instead of {count}"
+            )
+        key = self
+        next_roll = [key]
+        while len(next_roll) < count:
+            if key.roll_next:
+                key = key.roll_next
+                next_roll.append(key)
+            else:
+                next_roll.clear()
+                break
+        if next_roll and len(next_roll) != count:
+            raise Exception(
+                f"Bad next_roll has been generated, got {len(next_roll)} instead of {count}"
+            )
+        rolls = [r for r in [previous_roll, next_roll] if r]
+        return rolls
 
 
 class Char:
