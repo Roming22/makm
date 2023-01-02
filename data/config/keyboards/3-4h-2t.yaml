@@ -7,64 +7,77 @@ score:
   rows:
     home: 0
     top: 4
-    cluster: 0
+    thumb1: 0
+    thumb2: 2
 layout:
-    rows:
-      top:
-        left:
-          - ring
-          - major
-          - index
-        right:
-          - index
-          - major
-          - ring
-      home:
-        left:
-          - pinky
-          - ring
-          - major
-          - index
-        right:
-          - index
-          - major
-          - ring
-          - pinky
-      cluster:
-        left:
-          - thumb1
-          - thumb2
-        right:
-          - thumb2
-          - thumb1
-    layers:
-      - layer1
-      - layer2
-      # - layer3
-      # - layer4
+  rows:
+    top:
+      left:
+        - ring
+        - major
+        - index
+      right:
+        - index
+        - major
+        - ring
+    home:
+      left:
+        - pinky
+        - ring
+        - major
+        - index
+      right:
+        - index
+        - major
+        - ring
+        - pinky
+    thumb1:
+      left:
+        - thumb
+      right:
+        - thumb
+    # thumb2:
+    #   left:
+    #     - thumb
+    #   right:
+    #     - thumb
+  layers:
+    - layer1
+    - layer2
+    # - layer3
+    # - layer4
 constraints:
   - layer1:
-      - left:
-        - thumb1: "space/shift"
-        - thumb2: "meh"
-      - right:
-        - thumb1: "layer2"
-        - thumb2: "enter"
+      - thumb1:
+          - left:
+              - thumb: "\\s"
+          - right:
+              - thumb: "layer2"
+      - thumb2:
+          - left:
+              - thumb: "meh"
+          - right:
+              - thumb: "\\n"
   - layer2:
-    - cluster:
-      - left:
-        - thumb1: "space/shift"
-        - thumb2: "layer1"
-      - right:
-        - thumb1: "layer3"
-        - thumb2: "layer4"
+      - thumb1:
+          - left:
+              - thumb: "\\s"
+          - right:
+              - thumb: "layer1"
+      - thumb2:
+          - left:
+              - thumb: "layer3"
+          - right:
+              - thumb: "layer4"
   - layer3:
-    - cluster:
-      - left:
-        - thumb1: "space/shift"
-        - thumb2: "layer1"
+      - thumb1:
+          - left:
+              - thumb: "\\s"
+          - right:
+              - thumb: "layer1"
   - layer4:
-    - cluster:
-      - left:
-        - thumb1: "space/shift"
-        - thumb2: "layer1"
+      - thumb1:
+          - left:
+              - thumb: "\\s"
+          - right:
+              - thumb: "layer1"

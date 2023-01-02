@@ -1,19 +1,20 @@
 score:
   fingers:
     left:
-      thumb1: 7
-      thumb2: 11
+      thumb: 7
       index: 1
       major: 3
       ring: 5
       pinky: 9
     right:
-      thumb1: 8
-      thumb2: 12
+      thumb: 8
       index: 2
       major: 4
       ring: 6
       pinky: 10
+  rolls:
+    bigram: -2
+    trigram: -2
 corpus:
   i18n:
     en-us:

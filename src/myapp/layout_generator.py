@@ -1,142 +1,112 @@
 """Generate keyboard layouts"""
-import copy
+import random
+import time
 
 import layout_calculator
+from keyboard import Char, Keyboard
 
 
 def generate(corpus: dict, config: dict):
-    heatmap = sorted(
-        generate_heatmap(config)[".keys"].items(), key=lambda x: x[1], reverse=True
-    )
-    print(heatmap)
-    keymap = {k: {"heat": v, "key": None, "score": None} for k, v in heatmap}
-    keymap_tree = {
-        "heatmap": heatmap,
+    keyboard = Keyboard(config["keyboard"])
+    keyboard.print("heat")
+    chars = [
+        Char(c, v)
+        for c, v in sorted(corpus["letter_count"].items(), key=lambda x: x[1])
+    ]
+    keyboard_tree = {
+        "char": "root",
         "key": "root",
-        "keymap": keymap,
+        "keyboard": keyboard,
         "worst_score": None,
         "best_score": None,
-        "missing_keys": sorted(corpus["letter_count"].items(), key=lambda x: x[1]),
+        "missing_chars": chars,
         "nodes": [],
         "parent": None,
         "progress": 0,
     }
-    search_for_best_keymap(keymap_tree, corpus, config)
-    keyboards = keymaptree_to_keyboards(keymap_tree)
-    for keyboard in enumerate(keyboards):
-        print_keyboard(keyboard)
+    search_for_best_keyboard(keyboard_tree, corpus, config)
+    keyboards = keyboardtree_to_keyboards(keyboard_tree)
+    print(len(keyboards), "keyboard generated")
+    for keyboard in keyboards:
+        keyboard.print()
+    print(len(keyboards), "keyboard generated")
     return
 
 
-def generate_keyboard_layout(config: dict) -> dict:
-    layout = {
-        ".layout": config,
-    }
-    for layer in config["layers"]:
-        layout[layer] = {}
-        for row, hands in config["rows"].items():
-            layout[layer][row] = {}
-            for hand, fingers in hands.items():
-                layout[layer][row][hand] = {f: "" for f in fingers}
-    return layout
-
-
-def generate_heatmap(config: dict) -> dict:
-    layout = config["keyboard"]["layout"]
-    heatmap = generate_keyboard_layout(layout)
-    heatmap[".name"] = "Heatmap"
-    heatmap[".keys"] = {}
-    score = config["keyboard"]["score"]
-    for layer, rows in heatmap.items():
-        if layer not in layout["layers"]:
-            continue
-        for row, hands in rows.items():
-            for hand, fingers in hands.items():
-                for finger in fingers.keys():
-                    heat = score["layers"][layer]
-                    heat += score["rows"][row]
-                    heat += score["fingers"][hand][finger]
-                    heatmap[layer][row][hand][finger] = heat
-                    heatmap[".keys"][(layer, row, hand, finger)] = heat
-    return heatmap
-
-
-def print_keyboard(keyboard: dict) -> None:
-    print()
-    print(f"# {keyboard.get('.name', 'Keyboard')}")
-    layout = keyboard[".layout"]
-    for layer in layout["layers"]:
-        print()
-        print(f"## {layer}")
-        for row, hands in layout["rows"].items():
-            for hand, fingers in hands.items():
-                for finger in fingers:
-                    print(
-                        f"[{keyboard.get(layer,{}).get(row,{}).get(hand,{}).get(finger,' ')}]",
-                        end="",
-                    )
-                print(" | ", end="")
-            print()
-
-
-def search_for_best_keymap(keymap_tree: dict, corpus: dict, config: dict):
-    if not keymap_tree["missing_keys"]:
+def search_for_best_keyboard(node: dict, corpus: dict, config: dict):
+    if not node["missing_chars"]:
+        if random.randint(1, 10) == 10:
+            display_progress(node)
         # print("No more keys :)")
         return
 
-    add_key_to_keymap_tree(keymap_tree, corpus, config)
-    remove_deadends(keymap_tree)
-    for node in keymap_tree["nodes"]:
-        keymap_tree["progress"] += 1
-        display_progress(node)
-        search_for_best_keymap(node, corpus, config)
+    add_key_to_keyboard_tree(node, corpus, config)
+    remove_deadends(node)
+    for child in node["nodes"]:
+        node["progress"] += 1
+        search_for_best_keyboard(child, corpus, config)
 
 
-def add_key_to_keymap_tree(node: dict, corpus: dict, config: dict) -> None:
-    key = node["missing_keys"][-1]
-    for _key in node["heatmap"]:
+def add_key_to_keyboard_tree(node: dict, corpus: dict, config: dict) -> None:
+    char = node["missing_chars"][-1]
+    free_keys = node["keyboard"].get_free_keys()
+    if not free_keys:
+        raise Exception("Not enough keys")
+    for key in free_keys:
         child = {
-            "heatmap": copy.deepcopy(node["heatmap"]),
-            "heatkey": _key,
-            "key": {"heat": _key[1], "key": key[0], "score": key[1]},
-            "keymap": copy.deepcopy(node["keymap"]),
+            "char": char.char,
+            "key": (key.layer, *key.fingering),
+            "keyboard": node["keyboard"].copy(),
             "worst_score": None,
             "best_score": None,
-            "missing_keys": node["missing_keys"][:-1],
+            "missing_chars": node["missing_chars"][:-1],
             "nodes": [],
             "parent": node,
             "progress": 0,
         }
-        child["keymap"][_key] = child["key"]
-        child["heatmap"].remove(_key)
+        child["keyboard"].assign_char_to_key(char, key)
+        if len(child["keyboard"].get_free_keys()) != len(free_keys) - 1:
+            raise Exception("Bad object management")
         child["best_score"], child["worst_score"] = layout_calculator.get_score(
-            child["keymap"], child["missing_keys"], corpus, config
+            child["keyboard"], child["missing_chars"], corpus, config
         )
-        # print(key, _key)
         node["nodes"].append(child)
 
 
 def remove_deadends(node: dict) -> None:
     best_score = min([n["best_score"] for n in node["nodes"]])
+    # print("bestscore for", node["char"], ":", best_score)
     remove = []
     for child in node["nodes"]:
         if child["worst_score"] > best_score:
             remove.append(child)
     for child in remove:
-        # print("Deadend:", child["key"], child["heatkey"])
+        # print("Deadend:", child["key"])
         node["nodes"].remove(child)
+    # time.sleep(3)
 
 
 def display_progress(node: dict) -> None:
-    progress = [f"[{len(node['missing_keys'])}]"]
-    while node["parent"]:
-        progress.append(f"{node['progress']}/{len(node['nodes'])}")
-        node = node["parent"]
-    progress.append(f"{node['progress']}/{len(node['nodes'])}")
-    print(" - ".join(reversed(progress)))
+    progress = []
+    parent = node["parent"]
+    while parent:
+        progress.append(
+            # f"{parent['nodes'][0]['char']}: {parent['progress']}/{len(parent['nodes'])}"
+            f"{parent['progress']}/{len(parent['nodes'])}"
+        )
+        parent = parent["parent"]
+    print("-".join(reversed(progress)))
 
 
-def keymaptree_to_keyboards(node: dict) -> list:
+def keyboardtree_to_keyboards(node: dict) -> list:
     keyboards = []
+    nodes = [node]
+    while nodes:
+        new_nodes = []
+        for nd in nodes:
+            new_nodes += nd["nodes"]
+        if not nd["missing_chars"]:
+            keyboards.append(nd["keyboard"])
+        nodes = new_nodes
 
     return keyboards
