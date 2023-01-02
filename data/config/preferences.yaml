@@ -1,19 +1,19 @@
 score:
   fingers:
     left:
-      thumb1: 0
-      thumb2: -3
-      index: 3
-      major: 0
-      ring: -2
-      pinky: -4
+      thumb1: 7
+      thumb2: 11
+      index: 1
+      major: 3
+      ring: 5
+      pinky: 9
     right:
-      thumb1: 0
-      thumb2: -3
-      index: 3
-      major: 0
-      ring: -2
-      pinky: -4
+      thumb1: 8
+      thumb2: 12
+      index: 2
+      major: 4
+      ring: 6
+      pinky: 10
 corpus:
   i18n:
     en-us:

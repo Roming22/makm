@@ -1,12 +1,12 @@
 score:
   layers:
     layer1: 0
-    layer2: -5
-    layer3: -10
-    layer4: -11
+    layer2: 15
+    layer3: 30
+    layer4: 32
   rows:
     home: 0
-    top: -3
+    top: 4
     cluster: 0
 layout:
     rows:
