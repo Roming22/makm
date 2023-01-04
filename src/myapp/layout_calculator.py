@@ -83,8 +83,10 @@ class Calculator:
                 if char:
                     ng += char
                 else:
-                    ng += " "
-            rolls.append(ng)
+                    ng = None
+                    break
+            if ng:
+                rolls.append(ng)
 
         for ng, score in self.ngrams[ngram][key.char].items():
             if ng in rolls:
