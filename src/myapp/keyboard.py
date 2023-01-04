@@ -1,210 +1,185 @@
-"""Representation of a keyboard keys and layout"""
+"""Representation of a keymap"""
 import collections
 import copy
 
+Column = collections.namedtuple("Column", ["score"])
+Hand = collections.namedtuple("Hand", ["columns"])
+Row = collections.namedtuple("Row", ["hands", "score"])
+Layer = collections.namedtuple("Layer", ["keyboard", "rows", "score", "name"])
+Keymap = collections.namedtuple("Keymap", ["layers", "rolls", "definition", "name"])
 
-class Keyboard:
-    """Representation of a keyboard, with its keys and layout"""
+Char = collections.namedtuple("Char", ["char", "score"])
+Key = collections.namedtuple("Key", ["fingering", "score", "char"])
+Keyboard = collections.namedtuple("Keyboard", ["rows", "rolls"])
+Fingering = collections.namedtuple("Fingering", ["layer", "row", "hand", "column"])
 
-    _name = "Keyboard"
+
+class KeymapHelper:
+    """Helper methods for Keymap"""
+
+    _name = "Keymap"
     count = 0
 
-    def __init__(self, config: dict, name: str = None) -> None:
-        self._config = config["layout"]["layers"]
-        Keyboard.count += 1
-        self.layer = {}
-        if not name:
-            name = f"{self._name}{self.count}"
-        self.name = name
-
-        layout = Layout(config)
-        for layer in config["layout"]["layers"]:
-            score = config["score"]["layers"][layer]
-            self.layer[layer] = Layer(layout, score, layer)
-
-        for layer, rows in config["constraints"].items():
+    @classmethod
+    def add_constraints_to_keymap(cls, constraints, corpus, keymap: Keymap) -> Keymap:
+        corpus_dict = {c.char: c for c in corpus}
+        removed_chars = set()
+        for layer, rows in constraints.items():
             for row, hands in rows.items():
-                for hand, fingers in hands.items():
-                    print(layer, row, hand)
-                    for finger, char in fingers.items():
-                        print(char)
-                        fingering = (row, hand, finger)
-                        key = self.layer[layer].layout.row[row][fingering]
-                        key.char = Char(char[0], char[1])
-                        self.layer[layer].char[char] = key.char
-                        self.layer[layer].free_keys.remove(key)
-        self.print()
+                for hand, columns in hands.items():
+                    for column, c in columns.items():
+                        char = corpus_dict.get(c, Char(c, 0))
+                        key = cls.get_key(keymap, Fingering(layer, row, hand, column))
+                        if key is not None:
+                            if char in corpus:
+                                removed_chars.add(char)
+                            keymap = cls.assign_char_to_key(keymap, char, key)
+        for char in removed_chars:
+            corpus.remove(char)
+        return keymap
 
-    def assign_char_to_key(self, char, key):
-        key = self.layer[key.layer.name].layout.row[key.fingering[0]][key.fingering]
-        key.char = char
-        char.key = key
-        layer = self.layer[key.layer.name]
-        layer.char[char.char] = char
-        layer.free_keys.remove(key)
-        return key
+    @classmethod
+    def assign_char_to_key(cls, keymap: Keymap, char: Char, key: Key) -> Keymap:
+        layer, row, hand, column = key.fingering
+        key = Key(key.fingering, key.score * char.score, char.char)
+        new_keymap = cls.copy(keymap)
+        new_keymap.layers[layer].rows[row][hand][column] = key
+        return new_keymap
 
-    def copy(self, name: str = None):
-        Keyboard._count += 1
-        keyboard = copy.copy(self)
+    @classmethod
+    def copy(cls, src: Keymap, name: str = None) -> Keymap:
+        cls.count += 1
         if not name:
-            name = f"{self._name}{self._count}"
-        keyboard.name = name
-        keyboard.layer = {}
-        for lname, ldata in self.layer.items():
-            keyboard.layer[lname] = ldata.copy()
-        return keyboard
+            name = f"{cls._name}{cls.count}"
+        keymap = Keymap(copy.deepcopy(src.layers), src.rolls, src.definition, name)
+        return keymap
 
-    def get_chars(self):
-        chars = [self.layer[l].char for l in self._config]
-        return collections.ChainMap(*chars)
-
-    def get_free_keys(self):
+    @classmethod
+    def get_free_keys(cls, keymap: Keymap) -> list[Key]:
+        # This can probably be optimized by storing the list at each level
         free_keys = []
-        for layer in self._config:
-            for key in self.layer[layer].free_keys:
-                free_keys.append(key)
+        for layer in keymap.definition["layers"]:
+            for row in keymap.definition["rows"]:
+                for hand in keymap.definition["hands"]:
+                    for column in keymap.definition["columns"][hand]:
+                        key = cls.get_key(keymap, Fingering(layer, row, hand, column))
+                        if key is not None and key.char is None:
+                            free_keys.append(key)
         free_keys = sorted(free_keys, key=lambda x: x.score)
         return free_keys
 
-    def print(self, mode="char"):
-        print(f"# {self.name}")
-        for layer in self._config:
-            self.layer[layer].print(mode)
+    @staticmethod
+    def get_key(keymap: Keymap, fingering: Fingering) -> Key:
+        l, r, h, c = fingering
+        try:
+            return keymap.layers[l].rows[r][h][c]
+        except KeyError:
+            return None
 
+    @classmethod
+    def get_key_rolls(cls, keymap: Keymap, key: Key, length: int) -> list[list[Key]]:
+        rolls = []
+        roll_row = keymap.rolls[key.fingering.row][key.fingering.hand]
+        key_index = roll_row.index(
+            (key.fingering.row, key.fingering.hand, key.fingering.column)
+        )
+        start = max(0, key_index - length + 1)
+        stop = min(len(roll_row) - length, key_index) + 1
 
-class Layout:
-    """Representation of a layer"""
+        roll_fingering = [
+            Fingering(key.fingering.layer, row, hand, column)
+            for row, hand, column in roll_row
+        ]
 
-    def __init__(self, config: dict) -> None:
-        self._config = config["layout"]["rows"]
-        self.row = {}
-        for row, hands in config["layout"]["rows"].items():
-            self.row[row] = {}
-            for hand, fingers in hands.items():
-                previous = False
-                for finger in fingers:
-                    fingering = (row, hand, finger)
-                    score = config["score"]["rows"][row]
-                    score += config["score"]["fingers"][hand][finger]
-                    key = Key(fingering, score, previous)
-                    self.row[row][fingering] = key
-                    if previous:
-                        previous.roll_next = key
-                    previous = key
-                previous.roll_next = False
-
-
-class Layer:
-    """Representation of a layer"""
-
-    def __init__(self, layout: Layout, score: float, name="Layer") -> None:
-        self.char = {}
-        self.free_keys = []
-        self.layout = copy.deepcopy(layout)
-        self.name = name
-        self.score = score
-        for row, hands in self.layout._config.items():
-            for hand, fingers in hands.items():
-                for finger in fingers:
-                    key = self.layout.row[row][(row, hand, finger)]
-                    key.layer = self
-                    key.score += score
-                    self.free_keys.append(key)
-
-    def copy(self):
-        layer = copy.copy(self)
-        layer.layout = copy.deepcopy(self.layout)
-        layer.free_keys = []
-        for row, hands in layer.layout._config.items():
-            for hand, fingers in hands.items():
-                previous = False
-                for finger in fingers:
-                    fingering = (row, hand, finger)
-                    key = layer.layout.row.get(row, {}).get(fingering)
-                    if previous is not False:
-                        previous.roll_next = key
-                    if key.char is None:
-                        layer.free_keys.append(key)
-                    previous = key
-                key.roll_next = False
-                previous.roll_next = key
-        return layer
-
-    def print(self, mode):
-        print(f"## {self.name}")
-        lines = []
-        middle = 0
-        for row, hands in self.layout._config.items():
-            line = ""
-            for hand, fingers in hands.items():
-                for finger in fingers:
-                    fingering = (row, hand, finger)
-                    key = self.layout.row.get(row, {}).get(fingering)
-                    char = " "
-                    if mode == "char":
-                        if key and key.char:
-                            char = key.char.char
-                    elif mode == "heat":
-                        if key:
-                            char = key.score
-                    line += f"[{char}]"
-                line += " | "
-            lines.append(line)
-            middle = max(middle, line.index("|"))
-        for line in lines:
-            line = " " * (middle - line.index("|")) + line[:-3]
-            print(line)
-
-
-class Key:
-    """Representation of a key"""
-
-    def __init__(self, fingering: tuple, score: float, roll_previous=None):
-        self.char = None
-        self.fingering = fingering
-        self.layer = None
-        self.score = score
-
-        # Help figuring out ngrams
-        self.roll_previous = roll_previous
-        self.roll_next = None
-
-    def get_rolls(self, count) -> list:
-        key = self
-        previous_roll = [key]
-        while len(previous_roll) < count:
-            if key.roll_previous:
-                key = key.roll_previous
-                previous_roll.append(key)
-            else:
-                previous_roll.clear()
-                break
-        if previous_roll and len(previous_roll) != count:
-            raise Exception(
-                f"Bad previous_roll has been generated, got {len(previous_roll)} instead of {count}"
-            )
-        key = self
-        next_roll = [key]
-        while len(next_roll) < count:
-            if key.roll_next:
-                key = key.roll_next
-                next_roll.append(key)
-            else:
-                next_roll.clear()
-                break
-        if next_roll and len(next_roll) != count:
-            raise Exception(
-                f"Bad next_roll has been generated, got {len(next_roll)} instead of {count}"
-            )
-        rolls = [r for r in [previous_roll, next_roll] if r]
+        for i in range(start, stop):
+            rolls.append(roll_fingering[i : i + length])
         return rolls
 
+    @classmethod
+    def new(cls, config: dict, name: str = None) -> Keymap:
+        keyboard = KeyboardHelper.new(config)
+        cls.count += 1
+        if not name:
+            name = f"{cls._name}{cls.count}"
 
-class Char:
-    """Representation of a character"""
+        layers = {}
+        for layer in config["layout"]["definitions"]["layers"]:
+            layers[layer] = LayerHelper.new(
+                keyboard, config["score"]["layers"][layer], layer
+            )
 
-    def __init__(self, char, score):
-        self.char = char
-        self.key = None
-        self.score = score
+        return Keymap(layers, keyboard.rolls, config["layout"]["definitions"], name)
+
+    @staticmethod
+    def print(keymap, mode="char") -> None:
+        lines = [f"# {keymap.name}"]
+        middle = 0
+        for layer in keymap.definition["layers"]:
+            lines.append(f"## {keymap.layers[layer].name}")
+            for row in keymap.definition["rows"]:
+                hands = []
+                for hand in keymap.definition["hands"]:
+                    keys = []
+                    for column in keymap.definition["columns"][hand]:
+                        key = KeymapHelper.get_key(
+                            keymap, Fingering(layer, row, hand, column)
+                        )
+                        if key:
+                            char = " "
+                            if mode == "char":
+                                char = key.char if key.char else char
+                            elif mode == "score":
+                                char = key.score
+                            char = f"[{char}]"
+                            keys.append(char)
+                    hands.append("".join(keys))
+                line = " | ".join(hands)
+                lines.append(line)
+                middle = max(middle, line.index("|"))
+        for line in lines:
+            if "|" in line:
+                line = " " * (middle - line.index("|")) + line
+            print(line)
+        print(flush=True)
+
+
+class KeyboardHelper:
+    """Helper methods for Keyboard"""
+
+    @staticmethod
+    def new(config: dict) -> Keyboard:
+        rows: dict[str, Hand] = {}
+        rolls: dict[str, list(str)] = {}
+        for row, hands in config["layout"]["rows"].items():
+            rows[row] = {}
+            rolls[row] = {}
+            for hand, columns in hands.items():
+                roll = []
+                rows[row][hand] = {}
+                for column in columns:
+                    fingering = (row, hand, column)
+                    score = config["score"]["rows"][row]
+                    score += config["score"]["fingers"][hand][column]
+                    rows[row][hand][column] = Key(fingering, score, None)
+                    roll.append(fingering)
+                rolls[row][hand] = roll
+        return Keyboard(rows, rolls)
+
+
+class LayerHelper:
+    """Helper methods for Layer"""
+
+    @staticmethod
+    def new(keyboard: Keyboard, score: float, name="Layer") -> Layer:
+        new_rows = {}
+        for row, hands in keyboard.rows.items():
+            new_hands = {}
+            for hand, columns in hands.items():
+                new_columns = {}
+                for column, key in columns.items():
+                    fingering = Fingering(name, row, hand, column)
+                    key_score = score + key.score
+                    new_columns[column] = Key(fingering, key_score, None)
+                new_hands[hand] = new_columns
+            new_rows[row] = new_hands
+        return Layer(keyboard, new_rows, score, name)

@@ -10,6 +10,33 @@ score:
     thumb1: 0
     thumb2: 2
 layout:
+  definitions:
+    layers:
+      - layer1
+      - layer2
+      # - layer3
+      # - layer4
+    rows:
+      - top
+      - home
+      - thumb1
+      # - thumb2
+    hands:
+      - left
+      - right
+    columns:
+      left:
+        - pinky
+        - ring
+        - major
+        - index
+        - thumb
+      right:
+        - thumb
+        - index
+        - major
+        - ring
+        - pinky
   rows:
     top:
       left:
@@ -41,11 +68,6 @@ layout:
     #     - thumb
     #   right:
     #     - thumb
-  layers:
-    - layer1
-    - layer2
-    # - layer3
-    # - layer4
 constraints:
   layer1:
     thumb1:

@@ -1,8 +1,8 @@
-"""Score a keyboard layout"""
+"""Score a keymap"""
 # import time
 import typing
 
-from keyboard import Key, Keyboard
+from keyboard import Key, Keymap, KeymapHelper
 
 
 class Calculator:
@@ -15,26 +15,31 @@ class Calculator:
         self.worst_ngram_score = {}
 
     def set(self, corpus: dict, config: dict):
-        self.ngrams = {
+        ngrams = {
             "bigram": corpus["bigram_count"],
             "trigram": corpus["trigram_count"],
+        }
+        self.ngrams = {
+            "bigram": {},
+            "trigram": {},
         }
         self.ngrams_bonus = config["preferences"]["score"]["rolls"]
         self.best_ngram_pair_score = {}
         self.worst_ngram_score = {}
         for ng in ["bigram", "trigram"]:
-            bonus = self.ngrams_bonus[ng]
+            self.ngrams[ng] = {}
             self.best_ngram_pair_score[ng] = {}
             self.worst_ngram_score[ng] = {}
+            bonus = self.ngrams_bonus[ng]
             for char in corpus["letter_count"]:
-                ngs = [
-                    count * bonus
-                    for _ng, count in self.ngrams[ng].items()
-                    if char in _ng
-                ]
-                ngs = sorted(ngs)
-                self.best_ngram_pair_score[ng][char] = ngs.pop() + ngs.pop()
-                self.worst_ngram_score[ng][char] = ngs[0]
+                self.ngrams[ng][char] = {}
+                for ngram, count in ngrams[ng].items():
+                    if char in ngram:
+                        self.ngrams[ng][char][ngram] = count * bonus
+                ngs = sorted(self.ngrams[ng][char].values())
+                if len(ngs) > 1:
+                    self.best_ngram_pair_score[ng][char] = ngs.pop() + ngs.pop()
+                    self.worst_ngram_score[ng][char] = ngs[0]
 
     @classmethod
     def get(cls):
@@ -45,63 +50,52 @@ class Calculator:
     def get_score_for_key(
         self,
         key: Key,
-        keyboard: Keyboard,
+        keymap: Keymap,
         missing_chars: list,
     ) -> typing.Tuple[float, float]:
         scale = 1000000
-        base_score = self.get_base_score(key) / scale
+        base_score = self.get_base_score(keymap, key) / scale
         best_score = (
-            self.get_best_score_lower_bound(keyboard, missing_chars) / scale
-            + base_score
+            self.get_best_score_lower_bound(keymap, missing_chars) / scale + base_score
         )
         worst_score = (
-            self.get_worst_score_upper_bound(keyboard, missing_chars) / scale
-            + base_score
+            self.get_worst_score_upper_bound(keymap, missing_chars) / scale + base_score
         )
-        # print(best_score, worst_score)
         return best_score, worst_score
 
-    def get_base_score(self, key: Key) -> float:
+    def get_base_score(self, keymap: Keymap, key: Key) -> float:
         """Score with the populated keys"""
-        score = 0.0
-        score += key.score * key.char.score
-        ng_score = self.get_ngram_score_for_key(key, "bigram")
-        ng_score = self.get_ngram_score_for_key(key, "trigram")
-        score += ng_score
+        score = key.score
+        score += self.get_ngram_score_for_key(keymap, key, "bigram")
+        score += self.get_ngram_score_for_key(keymap, key, "trigram")
         return score
 
-    def get_ngram_score_for_key(self, key: Key, ngram: str) -> float:
+    def get_ngram_score_for_key(self, keymap: Keymap, key: Key, ngram: str) -> float:
         ngrams = self.ngrams[ngram]
-        roll_keys = key.get_rolls(len(next(iter(ngrams.keys()))))
-        ngrams = {
-            ng: count * self.ngrams_bonus[ngram]
-            for ng, count in ngrams.items()
-            if key.char.char in ng
-        }
-        for ng, score in ngrams.items():
-            for roll in roll_keys:
-                match = [[c, None] for c in ng]
-                for i, k in enumerate(roll):
-                    if k.char is not None and k.char.char == match[i][0]:
-                        match[i][1] = True
-                    else:
-                        match[i][1] = False
-                        break
-                # Perfect match
-                if not [f[1] for f in match if f[1] is not True]:
-                    return score
-                # Impossible roll
-                if [f[1] for f in match if f[1] is False]:
-                    break
+        rolls_fingering = KeymapHelper.get_key_rolls(
+            keymap, key, len(next(iter(ngrams.keys())))
+        )
+        rolls = []
+        for roll in rolls_fingering:
+            ng = ""
+            for fingering in roll:
+                char = KeymapHelper.get_key(keymap, fingering).char
+                if char:
+                    ng += char
+                else:
+                    ng += " "
+            rolls.append(ng)
+
+        for ng, score in self.ngrams[ngram][key.char].items():
+            if ng in rolls:
+                return score
         return 0.0
 
-    def get_best_score_lower_bound(
-        self, keyboard: Keyboard, missing_chars: list
-    ) -> float:
+    def get_best_score_lower_bound(self, keymap: Keymap, missing_chars: list) -> float:
         """This score must be equal or lower than the final score"""
         score = 0.0
         missing_chars = list(reversed(missing_chars))
-        free_keys = keyboard.get_free_keys()
+        free_keys = KeymapHelper.get_free_keys(keymap)
 
         while missing_chars:
             char = missing_chars.pop()
@@ -111,17 +105,15 @@ class Calculator:
             # No trigrams
         return score
 
-    def get_worst_score_upper_bound(
-        self, keyboard: Keyboard, missing_chars: list
-    ) -> float:
+    def get_worst_score_upper_bound(self, keymap: Keymap, missing_chars: list) -> float:
         """This score must be equal or greater than the final score"""
         score = 0.0
         missing_chars = list(missing_chars)
-        free_keys = keyboard.get_free_keys()
+        free_keys = KeymapHelper.get_free_keys(keymap)
 
         while missing_chars:
             # Key and chars are ordered by score/frequency
-            # which kaes calcuting the max score for single keys
+            # which ease calculating the max score for single keys
             # as easy as going through the sequence
             char = missing_chars.pop()
             key = free_keys.pop()

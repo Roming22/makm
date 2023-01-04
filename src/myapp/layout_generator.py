@@ -1,74 +1,75 @@
-"""Generate keyboard layouts"""
-import random
+"""Generate keymap layouts"""
 import time
 
-from keyboard import Char, Keyboard
+from keyboard import Char, KeymapHelper
 from layout_calculator import Calculator
 
 
 def generate(corpus: dict, config: dict):
-    # Add constraints to keyboard layout
-    for rows in config["keyboard"]["constraints"].values():
-        for hands in rows.values():
-            for fingers in hands.values():
-                for finger, char in fingers.items():
-                    try:
-                        fingers[finger] = (char, corpus["letter_count"].pop(char))
-                    except:
-                        fingers[finger] = (char, 0)
-    keyboard = Keyboard(config["keyboard"])
-    keyboard.print("heat")
-    Calculator.get().set(corpus, config)
     corpus_chars = [
         Char(c, v)
-        for c, v in sorted(corpus["letter_count"].items(), key=lambda x: x[1])[-6:]
+        for c, v in sorted(corpus["letter_count"].items(), key=lambda x: x[1])
     ]
-    keyboard_tree = {
+    keymap = KeymapHelper.new(config["keyboard"])
+    print()
+    KeymapHelper.print(keymap, "score")
+    keymap = KeymapHelper.add_constraints_to_keymap(
+        config["keyboard"]["constraints"], corpus_chars, keymap
+    )
+    KeymapHelper.print(keymap)
+    print()
+
+    Calculator.get().set(corpus, config)
+    keymap_tree = {
         "char": "root",
         "key": "root",
-        "keyboard": keyboard,
+        "keymap": keymap,
         "worst_score": None,
         "best_score": None,
-        "missing_chars": corpus_chars,
+        "missing_chars": corpus_chars[-9:],
         "nodes": [],
         "parent": None,
         "progress": 0,
     }
+
     start_time = time.time()
-    search_for_best_keyboard(keyboard_tree)
+    search_for_best_keymap(keymap_tree)
     runtime = time.time() - start_time
-    keyboards = keyboardtree_to_keyboards(keyboard_tree)
-    print(len(keyboards), "keyboard generated")
-    for keyboard in keyboards:
-        keyboard.print()
-    print(Keyboard.count / runtime, "keyboards/s")
+
+    results = keymaptree_to_results(keymap_tree)
+    print()
+    print(len(results), "keymap generated")
+    for node in results:
+        KeymapHelper.print(node["keymap"])
+        print("best:", node["best_score"], "    worst:", node["worst_score"])
+    print(KeymapHelper.count / runtime, "keyboards/s")
     return
 
 
-def search_for_best_keyboard(node: dict):
+def search_for_best_keymap(node: dict):
     print(".", end="", flush=True)
     if not node["missing_chars"]:
         print()
         display_progress(node)
         return
 
-    add_key_to_keyboard_tree(node)
+    add_key_to_keymap_tree(node)
     remove_deadends(node)
     for child in node["nodes"]:
         node["progress"] += 1
-        search_for_best_keyboard(child)
+        search_for_best_keymap(child)
 
 
-def add_key_to_keyboard_tree(node: dict) -> None:
+def add_key_to_keymap_tree(node: dict) -> None:
     char = node["missing_chars"][-1]
-    free_keys = node["keyboard"].get_free_keys()
+    free_keys = KeymapHelper.get_free_keys(node["keymap"])
     if not free_keys:
         raise Exception("Not enough keys")
     for key in free_keys[:5]:
         child = {
             "char": char.char,
-            "key": (key.layer.name, *key.fingering),
-            "keyboard": node["keyboard"].copy(),
+            "key": key.fingering,
+            "keymap": KeymapHelper.assign_char_to_key(node["keymap"], char, key),
             "worst_score": None,
             "best_score": None,
             "missing_chars": node["missing_chars"][:-1],
@@ -76,29 +77,44 @@ def add_key_to_keyboard_tree(node: dict) -> None:
             "parent": node,
             "progress": 0,
         }
-        child_key = child["keyboard"].assign_char_to_key(char, key)
-        if len(child["keyboard"].get_free_keys()) != len(free_keys) - 1:
-            raise Exception("Bad object management")
+        key = KeymapHelper.get_key(child["keymap"], key.fingering)
         child["best_score"], child["worst_score"] = Calculator.get().get_score_for_key(
-            child_key, child["keyboard"], child["missing_chars"]
+            key, child["keymap"], child["missing_chars"]
         )
         node["nodes"].append(child)
 
 
 def remove_deadends(node: dict) -> None:
-    worst_score = min([n["worst_score"] for n in node["nodes"]])
-    if node["worst_score"] is not None:
-        worst_score = min(worst_score, node["worst_score"])
+    best_score = get_best_score(node)
+    worst_score = get_worst_score(node)
     remove = []
     for child in node["nodes"]:
-        # print(child["char"], child["key"], child["best_score"], child["worst_score"])
-        if child["best_score"] > worst_score:
+        if child["best_score"] and child["best_score"] > worst_score:
             remove.append(child)
-    time.sleep(2)
     for child in remove:
-        # print("Deadend:", child["key"])
         node["nodes"].remove(child)
-    # time.sleep(3)
+        # node["best_score"] = best_score
+        # node["worst_score"] = worst_score
+        # print(node["char"], len(node["nodes"]))
+        # node = node["parent"]
+
+
+def get_best_score(node: dict) -> float:
+    score = max([n["best_score"] for n in node["nodes"] if n["best_score"] is not None])
+    if node["best_score"] is not None:
+        if score > node["best_score"]:
+            raise Exception("Best score should only increase")
+        score = min(score, node["best_score"])
+    return score
+
+
+def get_worst_score(node: dict) -> float:
+    score = min([n["worst_score"] for n in node["nodes"]])
+    if node["worst_score"] is not None:
+        if score > node["best_score"]:
+            raise Exception("Worst score should only decrease")
+        score = min(score, node["worst_score"])
+    return score
 
 
 def display_progress(node: dict) -> None:
@@ -110,16 +126,17 @@ def display_progress(node: dict) -> None:
     print("-".join(reversed(progress)), end="", flush=True)
 
 
-def keyboardtree_to_keyboards(node: dict) -> list:
-    keyboards = []
-    nodes = [node]
-    while nodes:
-        new_nodes = []
-        for nd in nodes:
-            new_nodes += nd["nodes"]
-        if not nd["missing_chars"]:
-            print("keyboard score:", nd["best_score"], nd["worst_score"])
-            keyboards.append(nd["keyboard"])
-        nodes = new_nodes
-
-    return keyboards
+def keymaptree_to_results(node: dict) -> list:
+    results = []
+    nodes = []
+    while node:
+        if node["missing_chars"]:
+            nodes += node["nodes"]
+        else:
+            results.append(node)
+        if nodes:
+            node = nodes.pop()
+        else:
+            node = False
+    results = sorted(results, key=lambda x: x["best_score"], reverse=True)
+    return results
