@@ -26,7 +26,7 @@ def generate(corpus: dict, config: dict):
         "keymap": keymap,
         "worst_score": None,
         "best_score": None,
-        "missing_chars": corpus_chars[-9:],
+        "missing_chars": corpus_chars[-11:],
         "nodes": [],
         "parent": None,
         "progress": 0,
@@ -41,23 +41,31 @@ def generate(corpus: dict, config: dict):
     print(len(results), "keymap generated")
     for node in results:
         KeymapHelper.print(node["keymap"])
-        print("best:", node["best_score"], "    worst:", node["worst_score"])
+        print("best:", node["best_score"], "    worst:", node["worst_score"], "\n\n")
+    print(len(results), "keymap generated")
     print(KeymapHelper.count / runtime, "keyboards/s")
     return
 
 
 def search_for_best_keymap(node: dict):
-    print(".", end="", flush=True)
-    if not node["missing_chars"]:
-        print()
-        display_progress(node)
-        return
-
-    add_key_to_keymap_tree(node)
-    remove_deadends(node)
-    for child in node["nodes"]:
-        node["progress"] += 1
-        search_for_best_keymap(child)
+    nodes = [node]
+    while nodes:
+        new_nodes = []
+        for node in nodes:
+            if not node["missing_chars"]:
+                return
+            add_key_to_keymap_tree(node)
+            new_nodes.extend(node["nodes"])
+        print(new_nodes[0]["char"], "", end="")
+        remove_deadends(
+            {
+                "nodes": new_nodes,
+                "best_score": node["best_score"],
+                "worst_score": node["worst_score"],
+            }
+        )
+        print(len(new_nodes))
+        nodes = new_nodes
 
 
 def add_key_to_keymap_tree(node: dict) -> None:
