@@ -15,7 +15,7 @@ format:
 	poetry run tools/qa/format.sh
 
 run:
-	"src/bin/run.sh" -d
+	"src/bin/run.sh"
 
 test: test_src test_qa
 

@@ -21,7 +21,7 @@ RUN groupadd -g 9999 user \
     && mkdir /opt/app \
     && chown user:user /opt/app
 USER user
-ENV PATH="/home/user/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ENV PATH="~/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 
 
@@ -55,4 +55,4 @@ RUN apt-get update \
     }; done \
     && apt-get clean \
     && rm -rf /opt/container
-USER user
+#USER user

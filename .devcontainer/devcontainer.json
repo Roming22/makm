@@ -19,6 +19,10 @@
         "yzhang.markdown-all-in-one",
     ],
     "postCreateCommand": "make vscode",
+    "runArgs": [
+        // "--privileged",
+        "--volume=${localWorkspaceFolder}:/workspace:Z"
+    ],
     // Set *default* container specific settings.json values on container create.
     "settings": {
         "editor.formatOnSave": true,
