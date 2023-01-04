@@ -57,15 +57,14 @@ def search_for_best_keymap(node: dict):
             add_key_to_keymap_tree(node)
             new_nodes.extend(node["nodes"])
         print(new_nodes[0]["char"], "", end="")
-        remove_deadends(
+        nodes = remove_deadends(
             {
                 "nodes": new_nodes,
                 "best_score": node["best_score"],
                 "worst_score": node["worst_score"],
             }
         )
-        print(len(new_nodes))
-        nodes = new_nodes
+        print(len(nodes))
 
 
 def add_key_to_keymap_tree(node: dict) -> None:
@@ -92,19 +91,15 @@ def add_key_to_keymap_tree(node: dict) -> None:
         node["nodes"].append(child)
 
 
-def remove_deadends(node: dict) -> None:
+def remove_deadends(node: dict) -> list:
     best_score = get_best_score(node)
     worst_score = get_worst_score(node)
-    remove = []
-    for child in node["nodes"]:
-        if child["best_score"] and child["best_score"] > worst_score:
-            remove.append(child)
-    for child in remove:
-        node["nodes"].remove(child)
-        # node["best_score"] = best_score
-        # node["worst_score"] = worst_score
-        # print(node["char"], len(node["nodes"]))
-        # node = node["parent"]
+    keep = []
+    while node["nodes"]:
+        child = node["nodes"].pop()
+        if child["best_score"] <= worst_score:
+            keep.append(child)
+    return keep
 
 
 def get_best_score(node: dict) -> float:
