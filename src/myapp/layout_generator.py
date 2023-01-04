@@ -26,7 +26,7 @@ def generate(corpus: dict, config: dict):
         "keymap": keymap,
         "worst_score": None,
         "best_score": None,
-        "missing_chars": corpus_chars[-11:],
+        "missing_chars": corpus_chars[-14:],
         "nodes": [],
         "parent": None,
         "progress": 0,

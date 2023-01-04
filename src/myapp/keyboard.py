@@ -5,7 +5,9 @@ import copy
 from frozendict import frozendict
 
 Layer = collections.namedtuple("Layer", ["keyboard", "rows", "score", "name"])
-Keymap = collections.namedtuple("Keymap", ["keys", "rolls", "definition", "name"])
+Keymap = collections.namedtuple(
+    "Keymap", ["keys", "mapping", "rolls", "definition", "name"]
+)
 
 Char = collections.namedtuple("Char", ["char", "score"])
 Key = collections.namedtuple("Key", ["fingering", "score", "char"])
@@ -43,11 +45,13 @@ class KeymapHelper:
         cls.count += 1
         name = f"{cls._name}{cls.count}"
         new_keymap = Keymap(
-            keymap.keys.set(key.fingering, key),
+            list(keymap.keys),
+            keymap.mapping,
             keymap.rolls,
             keymap.definition,
             name,
         )
+        new_keymap.keys[keymap.mapping[key.fingering]] = key
         return new_keymap
 
     @staticmethod
@@ -75,7 +79,7 @@ class KeymapHelper:
     @staticmethod
     def get_key(keymap: Keymap, fingering: Fingering) -> Key:
         try:
-            return keymap.keys[fingering]
+            return keymap.keys[keymap.mapping[fingering]]
         except KeyError:
             return None
 
@@ -103,14 +107,17 @@ class KeymapHelper:
         if not name:
             name = f"{cls._name}{cls.count}"
 
-        keys = {}
+        keys = []
+        mapping = {}
         for layer in config["layout"]["definitions"]["layers"]:
             for fingering, key in keyboard.keys.items():
                 fingering = Fingering(layer, *fingering[1:])
                 key_score = config["score"]["layers"][layer] + key.score
-                keys[fingering] = Key(fingering, key_score, None)
+                mapping[fingering] = len(keys)
+                keys.append(Key(fingering, key_score, None))
         return Keymap(
-            frozendict(keys),
+            keys,
+            frozendict(mapping),
             frozendict(keyboard.rolls),
             frozendict(config["layout"]["definitions"]),
             name,
