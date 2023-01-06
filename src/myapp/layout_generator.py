@@ -1,8 +1,8 @@
 """Generate keymap layouts"""
 import time
 
-from keyboard import Char, KeymapHelper
-from layout_calculator import Calculator
+from myapp.keyboard import Char, KeymapHelper
+from myapp.layout_calculator import Calculator
 
 
 def generate(corpus: dict, config: dict):

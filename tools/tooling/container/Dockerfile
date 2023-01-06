@@ -50,8 +50,8 @@ FROM builder AS dev
 
 USER root
 COPY tools/tooling/container/dev /opt/container
-ENV PATH="/home/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ENV PYTHONPATH="/workspace/src:"
+ENV PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ENV PYTHONPATH="/workspace/src:/workspace/.venv/lib/python3.9/site-packages"
 RUN apt-get update \
     && for PACKAGE in `cat /opt/container/packages.txt`; do {\
     apt-get install -y "${PACKAGE}" \

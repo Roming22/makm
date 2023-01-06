@@ -9,9 +9,10 @@ from myapp.__version__ import __commit__, __version__
 APP_NAME = __name__.split(".", maxsplit=1)[0]
 
 import click
-import config_reader
-import corpus_processor
-import layout_generator
+
+import myapp.config_reader as config_reader
+import myapp.corpus_processor as corpus_processor
+import myapp.layout_generator as layout_generator
 
 
 @click.command()

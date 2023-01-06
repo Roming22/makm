@@ -2,7 +2,7 @@
 # import time
 import typing
 
-from keyboard import Key, Keymap, KeymapHelper
+from myapp.keyboard import Key, Keymap, KeymapHelper
 
 
 class Calculator:

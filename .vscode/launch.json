@@ -5,13 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Pytest: Current File",
+            "name": "Run",
             "type": "python",
             "request": "launch",
-            "program": ".venv/bin/pytest",
-            "args": [
-                "${file}"
-            ],
+            "program": "src/myapp/main.py",
             "console": "integratedTerminal"
         }
     ]
