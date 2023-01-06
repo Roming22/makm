@@ -21,14 +21,13 @@ RUN groupadd -g 9999 user \
     && mkdir /opt/app \
     && chown user:user /opt/app
 USER user
-ENV PATH="~/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 
 
 ################################################################################
 FROM builder AS release
 
-
+ENV PATH="/home/user/.local/bin:/usr/local/bin:/usr/bin:/bin"
 WORKDIR /opt/app
 
 # Split poetry setup from application data to speed up builds
@@ -41,13 +40,18 @@ RUN mkdir myapp \
 
 COPY --chown=user:user src/ /opt/app/
 
+ENV PATH="/home/user/.local/bin:/usr/local/bin:/usr/bin:/bin"
 CMD ["bin/run.sh"]
+
+
 
 ################################################################################
 FROM builder AS dev
 
-COPY tools/tooling/container/dev /opt/container
 USER root
+COPY tools/tooling/container/dev /opt/container
+ENV PATH="/home/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ENV PYTHONPATH="/workspace/src:"
 RUN apt-get update \
     && for PACKAGE in `cat /opt/container/packages.txt`; do {\
     apt-get install -y "${PACKAGE}" \
@@ -55,4 +59,3 @@ RUN apt-get update \
     }; done \
     && apt-get clean \
     && rm -rf /opt/container
-#USER user

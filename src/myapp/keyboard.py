@@ -1,12 +1,11 @@
 """Representation of a keymap"""
 import collections
-import copy
 
 from frozendict import frozendict
 
 Layer = collections.namedtuple("Layer", ["keyboard", "rows", "score", "name"])
 Keymap = collections.namedtuple(
-    "Keymap", ["keys", "mapping", "rolls", "definition", "name"]
+    "Keymap", ["keys", "mapping", "rolls", "free_keys", "definition", "name"]
 )
 
 Char = collections.namedtuple("Char", ["char", "score"])
@@ -44,10 +43,17 @@ class KeymapHelper:
         key = Key(key.fingering, key.score * char.score, char.char)
         cls.count += 1
         name = f"{cls._name}{cls.count}"
+        index = keymap.mapping[key.fingering]
+        split_at = keymap.free_keys.index(index)
+        free_keys = list(keymap.free_keys[0:split_at])
+        free_keys.extend(keymap.free_keys[split_at + 1 :])
+        if index in free_keys:
+            raise Exception("Bad key removed")
         new_keymap = Keymap(
             list(keymap.keys),
             keymap.mapping,
             keymap.rolls,
+            free_keys,
             keymap.definition,
             name,
         )
@@ -61,20 +67,6 @@ class KeymapHelper:
                 for hand in keymap.definition["hands"]:
                     for column in keymap.definition["columns"][hand]:
                         yield Fingering(layer, row, hand, column)
-
-    @classmethod
-    def get_free_keys(cls, keymap: Keymap) -> list[Key]:
-        # This can probably be optimized by storing the list at each level
-        free_keys = []
-        for layer in keymap.definition["layers"]:
-            for row in keymap.definition["rows"]:
-                for hand in keymap.definition["hands"]:
-                    for column in keymap.definition["columns"][hand]:
-                        key = cls.get_key(keymap, Fingering(layer, row, hand, column))
-                        if key is not None and key.char is None:
-                            free_keys.append(key)
-        free_keys = sorted(free_keys, key=lambda x: x.score)
-        return free_keys
 
     @staticmethod
     def get_key(keymap: Keymap, fingering: Fingering) -> Key:
@@ -109,16 +101,21 @@ class KeymapHelper:
 
         keys = []
         mapping = {}
+        free_keys = []
         for layer in config["layout"]["definitions"]["layers"]:
             for fingering, key in keyboard.keys.items():
                 fingering = Fingering(layer, *fingering[1:])
                 key_score = config["score"]["layers"][layer] + key.score
+                key_score = 0.99 ** (2 * key_score)
                 mapping[fingering] = len(keys)
+                free_keys.append(len(keys))
                 keys.append(Key(fingering, key_score, None))
+        free_keys = sorted(free_keys, key=lambda x: keys[x].score, reverse=True)
         return Keymap(
             keys,
             frozendict(mapping),
             frozendict(keyboard.rolls),
+            free_keys,
             frozendict(config["layout"]["definitions"]),
             name,
         )

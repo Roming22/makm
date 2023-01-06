@@ -13,8 +13,8 @@ score:
       ring: 6
       pinky: 12
   rolls:
-    bigram: -2
-    trigram: -2
+    bigram: 1.2
+    trigram: 1.2
 corpus:
   i18n:
     en-us:
