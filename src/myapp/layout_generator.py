@@ -26,10 +26,11 @@ def generate(corpus: dict, config: dict):
     keymap_tree = {
         "base_score": 0,
         "char": "root",
+        "exploration": config["preferences"]["exploration"],
         "key": "root",
         "keymap": keymap,
         "lower_score_limit": None,
-        "missing_chars": corpus_chars[:11],
+        "missing_chars": corpus_chars,
         "upper_score_limit": None,
     }
 
@@ -42,10 +43,8 @@ def generate(corpus: dict, config: dict):
     for node in results:
         KeymapHelper.print(node["keymap"])
         print(
-            "best:",
+            "Score:",
             node["lower_score_limit"],
-            "    worst:",
-            node["upper_score_limit"],
             "\n\n",
         )
     print(len(results), "keymap generated")
@@ -56,14 +55,14 @@ def generate(corpus: dict, config: dict):
 def search_for_best_keymap(node: dict) -> list:
     nodes = [node]
     while nodes:
+        if not nodes[0]["missing_chars"]:
+            print("results", len(nodes))
+            sorted(nodes, key=lambda x: x["upper_score_limit"], reverse=True)
+            return nodes
+
+        print(nodes[0]["missing_chars"][0].char, end=": ", flush=True)
         new_nodes = []
-        if nodes[0]["missing_chars"]:
-            print(nodes[0]["missing_chars"][0].char, end=": ", flush=True)
         for node in nodes:
-            if not nodes[0]["missing_chars"]:
-                print("results", len(nodes))
-                sorted(nodes, key=lambda x: x["upper_score_limit"], reverse=True)
-                return nodes
             if not ScoreChecker.is_deprecated(node):
                 new_nodes.extend(add_key_to_keymap_tree(node))
         print(len(new_nodes))
@@ -73,19 +72,20 @@ def search_for_best_keymap(node: dict) -> list:
 
 def add_key_to_keymap_tree(node: dict) -> list:
     char = node["missing_chars"][0]
-    free_keys = [node["keymap"].keys[f] for f in node["keymap"].free_keys[:6]]
+    free_keys = [node["keymap"].keys[f] for f in node["keymap"].free_keys]
     if not free_keys:
         raise Exception("Not enough keys")
     nodes = []
-    for key in free_keys[:8]:
+    for key in free_keys[: node["exploration"]["max_keys"]]:
         child = {
             "base_score": node["base_score"],
             "char": char.char,
+            "exploration": node["exploration"],
             "key": key.fingering,
             "keymap": KeymapHelper.assign_char_to_key(node["keymap"], char, key),
             "lower_score_limit": node["base_score"],
-            "upper_score_limit": node["base_score"],
             "missing_chars": node["missing_chars"][1:],
+            "upper_score_limit": node["base_score"],
         }
         key = KeymapHelper.get_key(child["keymap"], key.fingering)
         (
@@ -93,7 +93,9 @@ def add_key_to_keymap_tree(node: dict) -> list:
             lower_score_limit,
             upper_score_limit,
         ) = Calculator.get().get_score_for_key(
-            key, child["keymap"], child["missing_chars"]
+            key,
+            child["keymap"],
+            child["missing_chars"][: node["exploration"]["rolling_window"]],
         )
         child["base_score"] += base_score
         child["lower_score_limit"] += lower_score_limit
@@ -118,6 +120,7 @@ class ScoreChecker:
             cls.lower_score_node = node
         elif cls.lower_score_node["lower_score_limit"] < node["lower_score_limit"]:
             cls.lower_score_node = node
+            KeymapHelper.print(node["keymap"])
 
         # print("RESULT UPPER:", cls.upper_score_node["upper_score_limit"])
         # print()

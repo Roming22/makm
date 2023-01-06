@@ -1,17 +1,17 @@
 score:
   fingers:
     left:
-      thumb: 7
+      thumb: 9
       index: 1
-      major: 3
-      ring: 5
-      pinky: 11
-    right:
-      thumb: 8
-      index: 2
-      major: 4
+      major: 2
       ring: 6
-      pinky: 12
+      pinky: 7
+    right:
+      thumb: 10
+      index: 3
+      major: 4
+      ring: 5
+      pinky: 8
   rolls:
     bigram: 1.2
     trigram: 1.2
@@ -24,3 +24,6 @@ corpus:
       weight: 2
     shell:
       weight: 2
+exploration:
+  max_keys: 2
+  rolling_window: 10
