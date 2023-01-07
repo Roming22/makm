@@ -91,15 +91,12 @@ class Calculator:
         return score
 
     def get_ngram_score_for_key(self, keymap: Keymap, key: Key, ngram: str) -> float:
-        ngrams = self.ngrams[ngram]
-        rolls_fingering = KeymapHelper.get_key_rolls(
-            keymap, key, len(next(iter(ngrams.keys())))
-        )
+        rolls_fingering = keymap.rolls[ngram][key.fingering]
         rolls = []
         for roll in rolls_fingering:
             ng = ""
-            for fingering in roll:
-                char = KeymapHelper.get_key(keymap, fingering).char
+            for key_index in roll:
+                char = keymap.keys[key_index].char
                 if char:
                     ng += char
                 else:

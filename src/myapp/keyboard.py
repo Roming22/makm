@@ -75,17 +75,20 @@ class KeymapHelper:
         except KeyError:
             return None
 
-    @classmethod
-    def get_key_rolls(cls, keymap: Keymap, key: Key, length: int) -> list[list[Key]]:
+    @staticmethod
+    def get_key_rolls(
+        key: Key, keyboard: Keyboard, mapping: dict[Fingering, int], length: int
+    ) -> list[list[int]]:
         layer, row, hand, column = key.fingering
         rolls = []
-        roll_row = keymap.rolls[row][hand]
+        roll_row = keyboard.rolls[row][hand]
         key_index = roll_row.index((None, row, hand, column))
         start = max(0, key_index - length + 1)
         stop = min(len(roll_row) - length, key_index) + 1
 
         roll_fingering = [
-            Fingering(layer, row, hand, column) for _, row, hand, column in roll_row
+            mapping[Fingering(layer, row, hand, column)]
+            for _, row, hand, column in roll_row
         ]
 
         for i in range(start, stop):
@@ -99,8 +102,11 @@ class KeymapHelper:
         if not name:
             name = f"{cls._name}{cls.count}"
 
-        keys = []
-        mapping = {}
+        rolls: dict(Fingering, dict[str, list[list[int]]]) = {}
+
+        # Create layers
+        keys: list(Key) = []
+        mapping: dict[Fingering, int] = {}
         free_keys = []
         for layer in config["layout"]["definitions"]["layers"]:
             for fingering, key in keyboard.keys.items():
@@ -111,10 +117,20 @@ class KeymapHelper:
                 free_keys.append(len(keys))
                 keys.append(Key(fingering, key_score, None))
         free_keys = sorted(free_keys, key=lambda x: keys[x].score, reverse=True)
+
+        # Compute rolls
+        rolls = {}
+        for ngram, length in {"bigram": 2, "trigram": 3}.items():
+            rolls[ngram] = {}
+            for key in keys:
+                rolls[ngram][key.fingering] = cls.get_key_rolls(
+                    key, keyboard, mapping, length
+                )
+
         return Keymap(
             keys,
             frozendict(mapping),
-            frozendict(keyboard.rolls),
+            frozendict(rolls),
             free_keys,
             frozendict(config["layout"]["definitions"]),
             name,
@@ -149,6 +165,25 @@ class KeymapHelper:
                 line = " " * (middle - line.index("|")) + line
             print(line)
         print(flush=True)
+
+    @classmethod
+    def save(cls, keymap) -> None:
+        with open(f"{keymap.name}.csv", "w") as f:
+            for layer in keymap.definition["layers"]:
+                for row in keymap.definition["rows"]:
+                    keys = []
+                    for hand in keymap.definition["hands"]:
+                        for column in keymap.definition["columns"][hand]:
+                            key = cls.get_key(
+                                keymap, Fingering(layer, row, hand, column)
+                            )
+                            char = ""
+                            if key and key.char:
+                                char = key.char
+                            keys.append(char)
+                    print(keys)
+                    f.write("\t".join(keys))
+                    f.write("\n")
 
 
 class KeyboardHelper:

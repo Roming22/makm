@@ -41,6 +41,7 @@ def generate(corpus: dict, config: dict):
     print()
     print(len(results), "keymap generated")
     for node in results:
+        KeymapHelper.save(node["keymap"])
         KeymapHelper.print(node["keymap"])
         print(
             "Score:",
@@ -120,7 +121,7 @@ class ScoreChecker:
             cls.lower_score_node = node
         elif cls.lower_score_node["lower_score_limit"] < node["lower_score_limit"]:
             cls.lower_score_node = node
-            KeymapHelper.print(node["keymap"])
+            # KeymapHelper.print(node["keymap"])
 
         # print("RESULT UPPER:", cls.upper_score_node["upper_score_limit"])
         # print()
@@ -133,6 +134,3 @@ class ScoreChecker:
             return False
         # print(">", node["upper_score_limit"])
         return node["upper_score_limit"] < cls.lower_score_node["lower_score_limit"]
-
-
-ScoreChecker.lower_score_node
