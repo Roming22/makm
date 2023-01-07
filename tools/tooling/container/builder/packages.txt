@@ -1,2 +1,3 @@
 curl
+lbzip2
 make

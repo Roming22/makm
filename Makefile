@@ -10,9 +10,13 @@ coverage:
 environment: poetry.lock
 	command -v poetry || pip install --user poetry
 	poetry install
+	poetry env use /usr/local/bin/pypy3
 
 format:
 	poetry run tools/qa/format.sh
+
+profile:
+	bash -c 'time "src/bin/run.sh" --profile'
 
 run:
 	"src/bin/run.sh"
