@@ -1,6 +1,8 @@
 # TODO: Freeze version and automate versions update
 FROM python:3.9-slim AS builder
 
+USER root
+
 # Make sure we don't get notifications we can't answer during building.
 ENV DEBIAN_FRONTEND noninteractive
 

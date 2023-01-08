@@ -19,10 +19,9 @@
         "yzhang.markdown-all-in-one",
     ],
     "postCreateCommand": "make vscode",
-    "runArgs": [
-        // "--privileged",
-        "--volume=${localWorkspaceFolder}:/workspace:Z"
-    ],
+    "remoteEnv": {
+        "PYTHONPATH": "/workspaces/makm/src:/workspaces/makm/.venv/lib/python3.9/site-packages"
+    },
     // Set *default* container specific settings.json values on container create.
     "settings": {
         "editor.formatOnSave": true,

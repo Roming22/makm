@@ -8,6 +8,7 @@
             "name": "Run",
             "type": "python",
             "request": "launch",
+            "python": "pypy3",
             "program": "src/myapp/main.py",
             "console": "integratedTerminal"
         }
