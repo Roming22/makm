@@ -2,19 +2,21 @@ score:
   fingers:
     left:
       thumb: 9
-      index: 1
-      major: 2
-      ring: 6
-      pinky: 7
+      index: 2
+      major: 1
+      ring: 3
+      pinky: 14
     right:
       thumb: 10
-      index: 3
+      index: 5
       major: 4
-      ring: 5
-      pinky: 8
+      ring: 6
+      pinky: 15
   rolls:
-    bigram: 1.2
-    trigram: 1.2
+    bigram: 0.5
+  same:
+    column: 1.2
+    row: .1
 corpus:
   i18n:
     en-us:
@@ -25,5 +27,5 @@ corpus:
     shell:
       weight: 2
 exploration:
-  max_keys: 2
-  rolling_window: 10
+  max_keys: 3
+  rolling_window: 34

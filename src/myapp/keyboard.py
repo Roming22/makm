@@ -3,9 +3,8 @@ import collections
 
 from frozendict import frozendict
 
-Layer = collections.namedtuple("Layer", ["keyboard", "rows", "score", "name"])
 Keymap = collections.namedtuple(
-    "Keymap", ["keys", "mapping", "rolls", "free_keys", "definition", "name"]
+    "Keymap", ["keys", "mapping", "layers", "rolls", "free_keys", "definition", "name"]
 )
 
 Char = collections.namedtuple("Char", ["char", "score"])
@@ -31,9 +30,9 @@ class KeymapHelper:
                         char = corpus_dict.get(c, Char(c, 0))
                         key = cls.get_key(keymap, Fingering(layer, row, hand, column))
                         if key is not None:
+                            keymap = cls.assign_char_to_key(keymap, char, key)
                             if char in corpus:
                                 removed_chars.add(char)
-                            keymap = cls.assign_char_to_key(keymap, char, key)
         for char in removed_chars:
             corpus.remove(char)
         return keymap
@@ -52,6 +51,7 @@ class KeymapHelper:
         new_keymap = Keymap(
             list(keymap.keys),
             keymap.mapping,
+            keymap.layers,
             keymap.rolls,
             free_keys,
             keymap.definition,
@@ -107,20 +107,23 @@ class KeymapHelper:
         # Create layers
         keys: list(Key) = []
         mapping: dict[Fingering, int] = {}
+        layers: dict(str, list[int]) = {}
         free_keys = []
         for layer in config["layout"]["definitions"]["layers"]:
+            score_layer = config["score"]["layers"][layer]
+            layers[layer] = []
             for fingering, key in keyboard.keys.items():
                 fingering = Fingering(layer, *fingering[1:])
-                key_score = config["score"]["layers"][layer] + key.score
-                key_score = 0.99 ** (2 * key_score)
+                key_score = key.score * score_layer
                 mapping[fingering] = len(keys)
+                layers[layer].append(len(keys))
                 free_keys.append(len(keys))
                 keys.append(Key(fingering, key_score, None))
-        free_keys = sorted(free_keys, key=lambda x: keys[x].score, reverse=True)
+        free_keys = sorted(free_keys, key=lambda x: keys[x].score)
 
         # Compute rolls
         rolls = {}
-        for ngram, length in {"bigram": 2, "trigram": 3}.items():
+        for ngram, length in {"bigram": 2}.items():
             rolls[ngram] = {}
             for key in keys:
                 rolls[ngram][key.fingering] = cls.get_key_rolls(
@@ -130,6 +133,7 @@ class KeymapHelper:
         return Keymap(
             keys,
             frozendict(mapping),
+            frozendict(layers),
             frozendict(rolls),
             free_keys,
             frozendict(config["layout"]["definitions"]),
@@ -181,7 +185,6 @@ class KeymapHelper:
                             if key and key.char:
                                 char = key.char
                             keys.append(char)
-                    print(keys)
                     f.write("\t".join(keys))
                     f.write("\n")
 
@@ -199,8 +202,11 @@ class KeyboardHelper:
                 rolls[row][hand] = []
                 for column in columns:
                     fingering = Fingering(None, row, hand, column)
-                    score = config["score"]["rows"][row]
-                    score += config["score"]["fingers"][hand][column]
+                    score = (
+                        config["score"]["fingers"][hand][column]
+                        + config["score"]["rows"][row]
+                    )
+                    score = 1.01**score
                     keys[fingering] = Key(fingering, score, None)
                     rolls[row][hand].append(fingering)
         keyboard = Keyboard(frozendict(keys), frozendict(rolls))

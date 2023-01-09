@@ -1,12 +1,12 @@
 score:
   layers:
-    layer1: 0
-    layer2: 15
-    layer3: 30
-    layer4: 32
+    layer1: 1
+    layer2: 1.2
+    layer3: 1.4
+    layer4: 1.5
   rows:
     home: 0
-    top: 4
+    top: 7
     thumb1: 0
     thumb2: 2
 layout:
@@ -70,6 +70,9 @@ layout:
     #     - thumb
 constraints:
   layer1:
+    home:
+      left:
+        major: "e"
     thumb1:
       left:
         thumb: "\\s"
@@ -81,6 +84,11 @@ constraints:
       right:
         thumb: "\\n"
   layer2:
+    home:
+      left:
+        pinky: "X"
+      right:
+        pinky: "X"
     thumb1:
       left:
         thumb: "\\s"

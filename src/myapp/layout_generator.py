@@ -6,12 +6,34 @@ from myapp.layout_calculator import Calculator
 
 
 def generate(corpus: dict, config: dict):
+    # Limit corpus for tests
+    corpus["char"] = {
+        k: v
+        for k, v in list(
+            sorted(list(corpus["char"].items()), key=lambda x: x[1], reverse=True)
+        )[:18]
+    }
+    remove = []
+    for char in corpus["bigram"].keys():
+        if char not in corpus["char"].keys():
+            remove.append(char)
+    for char in remove:
+        corpus["bigram"].pop(char)
+    for char1 in corpus["bigram"].keys():
+        remove = []
+        for char2 in corpus["bigram"][char1].keys():
+            if char2 not in corpus["char"].keys():
+                remove.append(char2)
+        for char in remove:
+            try:
+                corpus["bigram"][char1].pop(char2)
+            except KeyError:
+                pass
     corpus_chars = [
-        Char(c, v)
-        for c, v in sorted(
-            corpus["letter_count"].items(), key=lambda x: x[1], reverse=True
-        )
+        Char(c, 1 + v)
+        for c, v in sorted(corpus["char"].items(), key=lambda x: x[1], reverse=True)
     ]
+    Calculator.get().set(corpus, config)
     keymap = KeymapHelper.new(config["keyboard"])
     print()
     KeymapHelper.print(keymap, "score")
@@ -22,7 +44,6 @@ def generate(corpus: dict, config: dict):
     KeymapHelper.print(keymap)
 
     print([c.char for c in corpus_chars])
-    Calculator.get().set(corpus, config)
     keymap_tree = {
         "base_score": 0,
         "char": "root",
@@ -55,19 +76,28 @@ def generate(corpus: dict, config: dict):
 
 def search_for_best_keymap(node: dict) -> list:
     nodes = [node]
+    count = 0
+    total = len(nodes[0]["missing_chars"])
     while nodes:
         if not nodes[0]["missing_chars"]:
             print("results", len(nodes))
             sorted(nodes, key=lambda x: x["upper_score_limit"], reverse=True)
             return nodes
 
-        print(nodes[0]["missing_chars"][0].char, end=": ", flush=True)
+        count += 1
+        print(
+            f"[{count}/{total}]",
+            nodes[0]["missing_chars"][0].char,
+            end=": ",
+            flush=True,
+        )
         new_nodes = []
         for node in nodes:
             if not ScoreChecker.is_deprecated(node):
                 new_nodes.extend(add_key_to_keymap_tree(node))
         print(len(new_nodes))
         nodes = new_nodes
+        ScoreChecker.reset()
     raise Exception("Bad Omen")
 
 
@@ -78,12 +108,13 @@ def add_key_to_keymap_tree(node: dict) -> list:
         raise Exception("Not enough keys")
     nodes = []
     for key in free_keys[: node["exploration"]["max_keys"]]:
+        new_keymap = KeymapHelper.assign_char_to_key(node["keymap"], char, key)
         child = {
             "base_score": node["base_score"],
             "char": char.char,
             "exploration": node["exploration"],
             "key": key.fingering,
-            "keymap": KeymapHelper.assign_char_to_key(node["keymap"], char, key),
+            "keymap": new_keymap,
             "lower_score_limit": node["base_score"],
             "missing_chars": node["missing_chars"][1:],
             "upper_score_limit": node["base_score"],
@@ -101,36 +132,29 @@ def add_key_to_keymap_tree(node: dict) -> list:
         child["base_score"] += base_score
         child["lower_score_limit"] += lower_score_limit
         child["upper_score_limit"] += upper_score_limit
-        if not ScoreChecker.is_deprecated(child):
-            ScoreChecker.check(child)
+        if ScoreChecker.check(child):
             nodes.append(child)
     return nodes
 
 
 class ScoreChecker:
-    lower_score_node: dict = None
-    upper_score_node: dict = None
+    upper_score_node: dict = {}
 
     @classmethod
     def check(cls, node) -> float:
-        # if cls.lower_score_node:
-        #     print("OVERALL UPPER:", cls.upper_score_node["upper_score_limit"])
-        #     print("NODE UPPER:", node["upper_score_limit"])
-
-        if cls.lower_score_node is None:
-            cls.lower_score_node = node
-        elif cls.lower_score_node["lower_score_limit"] < node["lower_score_limit"]:
-            cls.lower_score_node = node
-            # KeymapHelper.print(node["keymap"])
-
-        # print("RESULT UPPER:", cls.upper_score_node["upper_score_limit"])
-        # print()
-
+        if (
+            not cls.upper_score_node
+            or cls.upper_score_node["upper_score_limit"] > node["upper_score_limit"]
+        ):
+            cls.upper_score_node = node
         return not cls.is_deprecated(node)
 
     @classmethod
     def is_deprecated(cls, node) -> bool:
-        if cls.lower_score_node is None:
+        if not cls.upper_score_node:
             return False
-        # print(">", node["upper_score_limit"])
-        return node["upper_score_limit"] < cls.lower_score_node["lower_score_limit"]
+        return node["lower_score_limit"] > cls.upper_score_node["upper_score_limit"]
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.upper_score_node = {}
