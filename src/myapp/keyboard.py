@@ -4,11 +4,22 @@ import collections
 from frozendict import frozendict
 
 Keymap = collections.namedtuple(
-    "Keymap", ["keys", "mapping", "layers", "rolls", "free_keys", "definition", "name"]
+    "Keymap",
+    [
+        "keys",
+        "mapping",
+        "char_mapping",
+        "layers",
+        "rolls",
+        "free_keys",
+        "hash",
+        "definition",
+        "name",
+        "score",
+    ],
 )
 
-Char = collections.namedtuple("Char", ["char", "score"])
-Key = collections.namedtuple("Key", ["fingering", "score", "char"])
+Key = collections.namedtuple("Key", ["fingering", "score", "char", "locked"])
 Keyboard = collections.namedtuple("Keyboard", ["keys", "rolls"])
 Fingering = collections.namedtuple("Fingering", ["layer", "row", "hand", "column"])
 
@@ -20,44 +31,74 @@ class KeymapHelper:
     count = 0
 
     @classmethod
-    def add_constraints_to_keymap(cls, constraints, corpus, keymap: Keymap) -> Keymap:
-        corpus_dict = {c.char: c for c in corpus}
-        removed_chars = set()
+    def add_constraints_to_keymap(
+        cls, constraints: dict, keymap: Keymap, chars: list[str]
+    ) -> Keymap:
         for layer, rows in constraints.items():
             for row, hands in rows.items():
                 for hand, columns in hands.items():
-                    for column, c in columns.items():
-                        char = corpus_dict.get(c, Char(c, 0))
+                    for column, char in columns.items():
                         key = cls.get_key(keymap, Fingering(layer, row, hand, column))
                         if key is not None:
-                            keymap = cls.assign_char_to_key(keymap, char, key)
-                            if char in corpus:
-                                removed_chars.add(char)
-        for char in removed_chars:
-            corpus.remove(char)
+                            keymap = cls.assign_char_to_key(
+                                keymap, char, key, locked=True
+                            )
+                        keymap.free_keys.remove(keymap.mapping[key.fingering])
+                        if char == "\\s":
+                            char = " "
+                        elif char == "\\n":
+                            char = "\n"
+                        try:
+                            chars.remove(char)
+                        except KeyError:
+                            pass
         return keymap
 
     @classmethod
-    def assign_char_to_key(cls, keymap: Keymap, char: Char, key: Key) -> Keymap:
-        key = Key(key.fingering, key.score * char.score, char.char)
-        cls.count += 1
-        name = f"{cls._name}{cls.count}"
-        index = keymap.mapping[key.fingering]
-        split_at = keymap.free_keys.index(index)
-        free_keys = list(keymap.free_keys[0:split_at])
-        free_keys.extend(keymap.free_keys[split_at + 1 :])
-        if index in free_keys:
-            raise Exception("Bad key removed")
+    def copy(cls, keymap, **override) -> Keymap:
+        if not "name" in override.keys():
+            cls.count += 1
+            name = f"{cls._name}{cls.count}"
+        else:
+            name = override["name"]
         new_keymap = Keymap(
-            list(keymap.keys),
-            keymap.mapping,
-            keymap.layers,
-            keymap.rolls,
-            free_keys,
-            keymap.definition,
+            override.get("keys", list(keymap.keys)),
+            override.get("mapping", keymap.mapping),
+            override.get("char_mapping", keymap.char_mapping),
+            override.get("layers", keymap.layers),
+            override.get("rolls", keymap.rolls),
+            override.get("free_keys", keymap.free_keys),
+            override.get("hash", list(keymap.hash)),
+            override.get("definition", keymap.definition),
             name,
+            override.get("score", keymap.score),
+        )
+        return new_keymap
+
+    @classmethod
+    def assign_char_to_key(
+        cls, keymap: Keymap, char: str, key: Key, locked: bool = False
+    ) -> Keymap:
+        key = Key(key.fingering, key.score, char, locked)
+        char_mapping = dict(keymap.char_mapping)
+        char_mapping[char] = key.fingering
+        new_keymap = cls.copy(
+            keymap,
+            char_mapping=frozendict(char_mapping),
+            name=keymap.name,
+            score=None,
         )
         new_keymap.keys[keymap.mapping[key.fingering]] = key
+        new_keymap.hash[keymap.mapping[key.fingering]] = char
+        return new_keymap
+
+    @classmethod
+    def set_score(cls, keymap: Keymap, score: int) -> Keymap:
+        new_keymap = cls.copy(
+            keymap,
+            name=keymap.name,
+            score=score,
+        )
         return new_keymap
 
     @staticmethod
@@ -67,6 +108,10 @@ class KeymapHelper:
                 for hand in keymap.definition["hands"]:
                     for column in keymap.definition["columns"][hand]:
                         yield Fingering(layer, row, hand, column)
+
+    @classmethod
+    def get_hash(cls, keymap: Keymap) -> str:
+        return "".join(keymap.hash)
 
     @staticmethod
     def get_key(keymap: Keymap, fingering: Fingering) -> Key:
@@ -96,9 +141,29 @@ class KeymapHelper:
         return rolls
 
     @classmethod
+    def get_rolls(cls, keymap: Keymap) -> dict[str]:
+        rolls = {}
+        for layer in keymap.definition["layers"]:
+            for row in keymap.definition["rows"]:
+                for hand in keymap.definition["hands"]:
+                    prev = ""
+                    for column in keymap.definition["columns"][hand]:
+                        key = cls.get_key(keymap, Fingering(layer, row, hand, column))
+                        if key is not None:
+                            char = key.char
+                        else:
+                            char = ""
+                        if prev and char:
+                            rolls[char] = rolls.get(char, [])
+                            rolls[char].append(prev)
+                            rolls[prev] = rolls.get(prev, [])
+                            rolls[prev].append(char)
+                        prev = char
+        return rolls
+
+    @classmethod
     def new(cls, config: dict, name: str = None) -> Keymap:
         keyboard = KeyboardHelper.new(config)
-        cls.count += 1
         if not name:
             name = f"{cls._name}{cls.count}"
 
@@ -114,11 +179,11 @@ class KeymapHelper:
             layers[layer] = []
             for fingering, key in keyboard.keys.items():
                 fingering = Fingering(layer, *fingering[1:])
-                key_score = key.score * score_layer
+                key_score = key.score + score_layer
                 mapping[fingering] = len(keys)
                 layers[layer].append(len(keys))
                 free_keys.append(len(keys))
-                keys.append(Key(fingering, key_score, None))
+                keys.append(Key(fingering, key_score, None, key.locked))
         free_keys = sorted(free_keys, key=lambda x: keys[x].score)
 
         # Compute rolls
@@ -130,14 +195,18 @@ class KeymapHelper:
                     key, keyboard, mapping, length
                 )
 
+        km_hash = ["X" for _ in keys]
         return Keymap(
             keys,
             frozendict(mapping),
+            frozendict({}),
             frozendict(layers),
             frozendict(rolls),
             free_keys,
+            km_hash,
             frozendict(config["layout"]["definitions"]),
             name,
+            None,
         )
 
     @classmethod
@@ -158,7 +227,10 @@ class KeymapHelper:
                                 char = key.char if key.char else char
                             elif mode == "score":
                                 char = key.score
-                            char = f"[{char}]"
+                            if key.locked:
+                                char = f"({char})"
+                            else:
+                                char = f"[{char}]"
                             keys.append(char)
                     hands.append("".join(keys))
                 line = " | ".join(hands)
@@ -206,8 +278,8 @@ class KeyboardHelper:
                         config["score"]["fingers"][hand][column]
                         + config["score"]["rows"][row]
                     )
-                    score = 1.01**score
-                    keys[fingering] = Key(fingering, score, None)
+                    # score = 1.01**score
+                    keys[fingering] = Key(fingering, score, None, False)
                     rolls[row][hand].append(fingering)
         keyboard = Keyboard(frozendict(keys), frozendict(rolls))
         return keyboard

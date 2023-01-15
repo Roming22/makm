@@ -20,51 +20,27 @@ def generate_data(corpus_preferences: dict) -> dict:
     language_weight = {k: v / total_weight for k, v in language_weight.items()}
 
     language_data = {}
-    language_data.update(generate_i18_data(corpus_preferences["i18n"], language_weight))
-    language_data.update(
-        generate_code_data(corpus_preferences["code"], language_weight)
-    )
-    corpus_data = consolidate_data(language_data, corpus_preferences)
-    if abs(sum(corpus_data["char"].values()) - 1) > 10 ** (-3):
-        raise Exception("Error while processing corpus")
-    total = 0.0
-    for char in corpus_data["bigram"].values():
-        total += sum(char.values())
-    if abs(total - 1) > 10 ** (-3):
-        raise Exception("Error while processing corpus")
-    with open("corpus.yaml", "w") as outfile:
-        yaml.dump(corpus_data, outfile, sort_keys=True)
+    language_data.update(generate_i18_data(corpus_preferences["i18n"]))
+    language_data.update(generate_code_data(corpus_preferences["code"]))
+    corpus_data = consolidate_data(language_data, language_weight)
     return corpus_data
 
 
-def generate_i18_data(languages: dict, language_weight: dict) -> dict:
+def generate_i18_data(languages: dict) -> dict:
     data = {}
     for language in languages.keys():
         corpus = load_dir_data(languages[language])
-        normalize_data(corpus, language_weight[language])
         data[language] = corpus
     return data
 
 
-def generate_code_data(languages: dict, language_weight: dict) -> dict:
+def generate_code_data(languages: dict) -> dict:
     data = {}
     for language in languages.keys():
-        print(language)
         get_sources(languages[language]["git_urls"], languages[language]["path"])
         corpus = load_dir_data(languages[language])
-        normalize_data(corpus, language_weight[language])
         data[language] = corpus
     return data
-
-
-def normalize_data(corpus, weight):
-    total = sum(corpus["char"].values())
-    for char, value in corpus["char"].items():
-        corpus["char"][char] = weight * value / total
-
-    for char, chars2 in corpus["bigram"].items():
-        for char2, value in chars2.items():
-            corpus["bigram"][char][char2] = weight * value / total
 
 
 def get_sources(urls: list[str], path: str) -> None:
@@ -76,8 +52,12 @@ def get_sources(urls: list[str], path: str) -> None:
 
 def load_dir_data(language: dict) -> dict:
     corpus = {
-        "char": {},
-        "bigram": {},
+        "size": 0,
+        "count": {
+            1: {},
+            2: {},
+            "transitions": {},
+        },
     }
     for _f in sorted(list_files(language["path"], language["extensions"])):
         with open(_f, "r") as file:
@@ -92,25 +72,24 @@ def list_files(path: str, extensions: list[str]) -> list[str]:
     return files
 
 
-def load_file_data(file, corpus) -> None:
-    previous_char = "\\n"
+def load_file_data(file, corpus: dict) -> None:
+    transitions = {}
     for line in file.readlines():
         line = line.strip()
         line = clean_line(line)
-        previous_char = load_line(line, previous_char, corpus)
-        previous_char = add_char("\\n", previous_char, corpus)
-    return
+        if line:
+            load_line(line, transitions, corpus)
 
 
 def clean_line(line: str) -> str:
     # That map may need to be per language
     translate_map = {
-        "\u2014": "-",
+        "\u2014": "--",
         "\u2019": "'",
         "\u201C": '"',
         "\u201D": '"',
     }
-    # That map may need to be per language.
+    # TODO: This should be a preference
     allowlist = "abcdefghijklmnopqrstuvwxyz"
 
     _line = list(line.lower())
@@ -125,49 +104,44 @@ def clean_line(line: str) -> str:
     return line
 
 
-def load_line(line, previous_char, corpus) -> str:
-    first = True
-    for word in line.split():
-        if first is False:
-            previous_char = add_char("\\s", previous_char, corpus)
-        previous_char = load_word(word, previous_char, corpus)
-        first = False
-    return previous_char
+def load_line(line: str, transitions: dict, corpus: dict) -> None:
+    last_char = "\n"
+    corpus["size"] += 1
+    for char in line:
+        load_char(char, last_char, transitions, corpus)
+        last_char = char
+    load_char("\n", char, transitions, corpus)
 
 
-def load_word(word, previous_char, corpus) -> str:
-    for char in word:
-        previous_char = add_char(char, previous_char, corpus)
-    return previous_char
+def load_char(char: str, last_char: str, transitions: dict, corpus: dict) -> None:
+    corpus["size"] += 1
+    corpus["count"][1][char] = corpus["count"][1].get(char, 0) + 1
+    corpus["count"][2][last_char] = corpus["count"][2].get(last_char, {})
+    corpus["count"][2][last_char][char] = corpus["count"][2][last_char].get(char, 0) + 1
+    for tchar in transitions.keys():
+        if tchar == char:
+            corpus["count"]["transitions"][char] = corpus["count"]["transitions"].get(
+                char, {}
+            )
+            for tchar in transitions[char]:
+                corpus["count"]["transitions"][char][tchar] = (
+                    corpus["count"]["transitions"][char].get(tchar, 0) + 1
+                )
+            transitions[char].clear()
+        else:
+            transitions[tchar] = transitions.get(tchar, set())
+            transitions[tchar].add(char)
 
 
-def add_char(char, previous_char, corpus):
-    corpus["char"][char] = corpus["char"].get(char, 0) + 1
-    corpus["bigram"][previous_char] = corpus["bigram"].get(previous_char, {})
-    corpus["bigram"][previous_char][char] = (
-        corpus["bigram"][previous_char].get(char, 0) + 1
-    )
-    return char
-
-
-def consolidate_data(language_data: dict, corpus_preferences: dict) -> dict:
+def consolidate_data(language_data: dict, language_weight: dict) -> dict:
     corpus_data = {
-        "char": dict(),
-        "bigram": {},
+        "char": set(),
+        "language": language_data,
     }
 
     for language, corpus in language_data.items():
         print()
-        print(language)
-
-        for char, value in corpus["char"].items():
-            corpus_data["char"][char] = corpus_data["char"].get(char, 0) + value
-
-        for char, chars2 in corpus["bigram"].items():
-            corpus_data["bigram"][char] = corpus_data["bigram"].get(char, {})
-            for char2, value in chars2.items():
-                corpus_data["bigram"][char][char2] = (
-                    corpus_data["bigram"][char].get(char2, 0) + value
-                )
-
+        print(f"{language}: {language_weight[language]}")
+        corpus_data["char"].update(corpus["count"][1].keys())
+        corpus["weight"] = language_weight[language]
     return corpus_data

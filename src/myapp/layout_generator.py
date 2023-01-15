@@ -1,160 +1,131 @@
 """Generate keymap layouts"""
+import random
 import time
 
-from myapp.keyboard import Char, KeymapHelper
+from myapp.keyboard import Fingering, Keymap, KeymapHelper
 from myapp.layout_calculator import Calculator
 
 
 def generate(corpus: dict, config: dict):
-    # Limit corpus for tests
-    corpus["char"] = {
-        k: v
-        for k, v in list(
-            sorted(list(corpus["char"].items()), key=lambda x: x[1], reverse=True)
-        )[:18]
-    }
-    remove = []
-    for char in corpus["bigram"].keys():
-        if char not in corpus["char"].keys():
-            remove.append(char)
-    for char in remove:
-        corpus["bigram"].pop(char)
-    for char1 in corpus["bigram"].keys():
-        remove = []
-        for char2 in corpus["bigram"][char1].keys():
-            if char2 not in corpus["char"].keys():
-                remove.append(char2)
-        for char in remove:
-            try:
-                corpus["bigram"][char1].pop(char2)
-            except KeyError:
-                pass
-    corpus_chars = [
-        Char(c, 1 + v)
-        for c, v in sorted(corpus["char"].items(), key=lambda x: x[1], reverse=True)
-    ]
     Calculator.get().set(corpus, config)
+
+    # Create template keymap
     keymap = KeymapHelper.new(config["keyboard"])
-    print()
-    KeymapHelper.print(keymap, "score")
     keymap = KeymapHelper.add_constraints_to_keymap(
-        config["keyboard"]["constraints"], corpus_chars, keymap
+        config["keyboard"]["constraints"], keymap, corpus["char"]
     )
-    print()
     KeymapHelper.print(keymap)
+    print()
 
-    print([c.char for c in corpus_chars])
-    keymap_tree = {
-        "base_score": 0,
-        "char": "root",
-        "exploration": config["preferences"]["exploration"],
-        "key": "root",
-        "keymap": keymap,
-        "lower_score_limit": None,
-        "missing_chars": corpus_chars,
-        "upper_score_limit": None,
-    }
+    # Create initial population
+    keymaps: list[Keymap] = []
+    while len(keymaps) < config["preferences"]["exploration"]["keep"]:
+        keymaps.append(generate_random_keymap(keymap, corpus["char"]))
 
-    start_time = time.time()
-    results = search_for_best_keymap(keymap_tree)
-    runtime = time.time() - start_time
+    keymaps = search_for_best_keymap(keymaps, corpus["char"], config)
 
     print()
-    print(len(results), "keymap generated")
-    for node in results:
-        KeymapHelper.save(node["keymap"])
-        KeymapHelper.print(node["keymap"])
-        print(
-            "Score:",
-            node["lower_score_limit"],
-            "\n\n",
-        )
-    print(len(results), "keymap generated")
-    print(KeymapHelper.count / runtime, "keyboards/s")
+    print(len(keymaps), "keymap generated")
+    for keymap in keymaps:
+        KeymapHelper.save(keymap)
+        KeymapHelper.print(keymap)
+        print(f"Score: {keymap.score}\n\n")
+    print(len(keymaps), "keymap generated")
     return
 
 
-def search_for_best_keymap(node: dict) -> list:
-    nodes = [node]
-    count = 0
-    total = len(nodes[0]["missing_chars"])
-    while nodes:
-        if not nodes[0]["missing_chars"]:
-            print("results", len(nodes))
-            sorted(nodes, key=lambda x: x["upper_score_limit"], reverse=True)
-            return nodes
+def search_for_best_keymap(
+    keymaps: list[Keymap], chars: list[str], config: dict
+) -> list[Keymap]:
+    known_keymaps: set[str] = set()
+    start_time = time.time()
+    for i in range(0, config["preferences"]["exploration"]["generations"]):
+        print(f"[{i+1}] ", end="", flush=True)
+        # Create a new generation
+        create_next_generation(keymaps, known_keymaps, chars, config)
+        for keymap in keymaps:
+            known_keymaps.add(KeymapHelper.get_hash(keymap))
+        # Keep best keymaps
+        keymaps = sorted(keymaps, key=lambda x: x.score)[
+            : config["preferences"]["exploration"]["keep"]
+        ]
+        print(f"Best score: {keymaps[0].score}")
+        KeymapHelper.print(keymaps[0])
+        print()
+    runtime = time.time() - start_time
+    print(f"{len(known_keymaps) / runtime}keyboards/s [{len(known_keymaps)}]")
+    return list(reversed(keymaps))[:20]
 
-        count += 1
-        print(
-            f"[{count}/{total}]",
-            nodes[0]["missing_chars"][0].char,
-            end=": ",
-            flush=True,
+
+def generate_random_keymap(keymap: Keymap, chars: list[str]) -> Keymap:
+    chars = list(chars)
+    random.shuffle(chars)
+    keymap = KeymapHelper.copy(keymap)
+    for index in keymap.free_keys:
+        keymap = KeymapHelper.assign_char_to_key(
+            keymap, chars.pop(), keymap.keys[index]
         )
-        new_nodes = []
-        for node in nodes:
-            if not ScoreChecker.is_deprecated(node):
-                new_nodes.extend(add_key_to_keymap_tree(node))
-        print(len(new_nodes))
-        nodes = new_nodes
-        ScoreChecker.reset()
-    raise Exception("Bad Omen")
+        if not chars:
+            break
+    # Calculate the score
+    score = Calculator.get().get_score(keymap)
+    keymap = KeymapHelper.set_score(keymap, score)
+    # KeymapHelper.print(keymap)
+    # print()
+    return keymap
 
 
-def add_key_to_keymap_tree(node: dict) -> list:
-    char = node["missing_chars"][0]
-    free_keys = [node["keymap"].keys[f] for f in node["keymap"].free_keys]
-    if not free_keys:
-        raise Exception("Not enough keys")
-    nodes = []
-    for key in free_keys[: node["exploration"]["max_keys"]]:
-        new_keymap = KeymapHelper.assign_char_to_key(node["keymap"], char, key)
-        child = {
-            "base_score": node["base_score"],
-            "char": char.char,
-            "exploration": node["exploration"],
-            "key": key.fingering,
-            "keymap": new_keymap,
-            "lower_score_limit": node["base_score"],
-            "missing_chars": node["missing_chars"][1:],
-            "upper_score_limit": node["base_score"],
-        }
-        key = KeymapHelper.get_key(child["keymap"], key.fingering)
-        (
-            base_score,
-            lower_score_limit,
-            upper_score_limit,
-        ) = Calculator.get().get_score_for_key(
-            key,
-            child["keymap"],
-            child["missing_chars"][: node["exploration"]["rolling_window"]],
-        )
-        child["base_score"] += base_score
-        child["lower_score_limit"] += lower_score_limit
-        child["upper_score_limit"] += upper_score_limit
-        if ScoreChecker.check(child):
-            nodes.append(child)
-    return nodes
+def create_next_generation(
+    keymaps: list[Keymap], known_keymaps: list[Keymap], chars: list[str], config: dict
+) -> None:
+    size = len(keymaps)
+    while len(keymaps) < config["preferences"]["exploration"]["population"]:
+        # Choose 2 keymaps at random
+        keymap1 = random.choice(keymaps[:size])
+        keymap2 = keymap1
+        while keymap2 == keymap1:
+            keymap2 = random.choice(keymaps[:size])
+        # Find all the chars on the right hand side of the first keymap
+        # ordered by their score on the second keymap.
+        chars = [
+            k.char
+            for k in sorted(
+                keymap1.keys,
+                key=lambda x: KeymapHelper.get_key(keymap2, x.fingering).score,
+            )
+            if k.fingering.hand == "right" and k.char in chars
+        ]
+        keymap = KeymapHelper.copy(keymap1)
+        # Add the missing letters based to the first keymap
+        for layer in keymap.definition["layers"]:
+            for row in keymap.definition["rows"]:
+                for column in keymap.definition["columns"]["right"]:
+                    if not chars:
+                        break
+                    key = KeymapHelper.get_key(
+                        keymap, Fingering(layer, row, "right", column)
+                    )
+                    if key is not None and not key.locked:
+                        keymap = KeymapHelper.assign_char_to_key(
+                            keymap,
+                            chars.pop(),
+                            key,
+                        )
+        # Add random mutations
+        for _ in range(0, len(keymap.mapping.keys())):
+            if (
+                random.randint(1, 100)
+                <= config["preferences"]["exploration"]["mutation_rate"]
+            ):
+                key1 = random.choice(keymap.keys)
+                key2 = random.choice(keymap.keys)
+                if key1.locked is False and key2.locked is False:
+                    keymap = KeymapHelper.assign_char_to_key(keymap, key2.char, key1)
+                    keymap = KeymapHelper.assign_char_to_key(keymap, key1.char, key2)
 
+        if KeymapHelper.get_hash(keymap) not in known_keymaps:
+            # Calculate the score
+            score = Calculator.get().get_score(keymap)
+            keymap = KeymapHelper.set_score(keymap, score)
 
-class ScoreChecker:
-    upper_score_node: dict = {}
-
-    @classmethod
-    def check(cls, node) -> float:
-        if (
-            not cls.upper_score_node
-            or cls.upper_score_node["upper_score_limit"] > node["upper_score_limit"]
-        ):
-            cls.upper_score_node = node
-        return not cls.is_deprecated(node)
-
-    @classmethod
-    def is_deprecated(cls, node) -> bool:
-        if not cls.upper_score_node:
-            return False
-        return node["lower_score_limit"] > cls.upper_score_node["upper_score_limit"]
-
-    @classmethod
-    def reset(cls) -> None:
-        cls.upper_score_node = {}
+            keymaps.append(keymap)

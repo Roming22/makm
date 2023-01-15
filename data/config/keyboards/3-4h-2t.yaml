@@ -1,14 +1,14 @@
 score:
   layers:
-    layer1: 1
-    layer2: 1.2
-    layer3: 1.4
-    layer4: 1.5
+    layer1: 0
+    layer2: 2
+    layer3: 2
+    layer4: 2.5
   rows:
     home: 0
-    top: 7
+    top: 1
     thumb1: 0
-    thumb2: 2
+    thumb2: 1
 layout:
   definitions:
     layers:
@@ -73,6 +73,13 @@ constraints:
     home:
       left:
         major: "e"
+      right:
+        major: "o"
+    top:
+      left:
+        major: "i"
+      right:
+        major: "a"
     thumb1:
       left:
         thumb: "\\s"
@@ -87,11 +94,13 @@ constraints:
     home:
       left:
         pinky: "X"
+        major: "y"
       right:
+        major: "u"
         pinky: "X"
     thumb1:
       left:
-        thumb: "\\s"
+        thumb: "X"
       right:
         thumb: "#3"
     # thumb2:

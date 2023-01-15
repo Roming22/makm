@@ -1,22 +1,21 @@
 score:
   fingers:
     left:
-      thumb: 9
-      index: 2
-      major: 1
-      ring: 3
-      pinky: 14
+      thumb: 1.0
+      index: 1.1
+      major: 1.01
+      ring: 1.21
+      pinky: 1.77
     right:
-      thumb: 10
-      index: 5
-      major: 4
-      ring: 6
-      pinky: 15
+      thumb: 1.001
+      index: 1.46
+      major: 1.33
+      ring: 1.61
+      pinky: 1.94
   rolls:
-    bigram: 0.5
-  same:
-    column: 1.2
-    row: .1
+    2: 0.5
+  same_finger: 0.3
+  repeat: 0.2
 corpus:
   i18n:
     en-us:
@@ -27,5 +26,7 @@ corpus:
     shell:
       weight: 2
 exploration:
-  max_keys: 3
-  rolling_window: 34
+  population: 200
+  keep: 15
+  generations: 1000
+  mutation_rate: 35
